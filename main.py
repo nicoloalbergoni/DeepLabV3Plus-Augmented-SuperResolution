@@ -10,8 +10,10 @@ weights_path = get_file('deeplabv3_xception_tf_dim_ordering_tf_kernels.h5',
                         cache_subdir=""
                         )
 
+
 model = Deeplabv3()
 model.load_weights(weights_path, by_name=True)
+
 
 tf.keras.utils.plot_model(
     model, to_file='./model.png', show_shapes=True, show_dtype=False,

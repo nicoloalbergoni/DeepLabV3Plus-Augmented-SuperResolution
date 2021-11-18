@@ -27,10 +27,12 @@ def Deeplabv3(weights='pascal_voc', input_tensor=None, input_shape=(512, 512, 3)
     else:
         img_input = input_tensor
 
-    x = EntryFlowBlock(img_input, entry_block3_stride)
-    x = MiddleFlowBlock(x, middle_block_rate, block_number=16)
+    x, skip = EntryFlowBlock(img_input, entry_block3_stride)
+    x = MiddleFlowBlocks(x, middle_block_rate, block_number=16)
     x = ExitFlowBlock(x, exit_block_rates)
     x = AtrousSpatialPyramidPooling(x, atrous_rates)
+
+    x = Decoder(x, skip)
 
     # Ensure that the model takes into account
     # any potential predecessors of `input_tensor`.
@@ -43,6 +45,12 @@ def Deeplabv3(weights='pascal_voc', input_tensor=None, input_shape=(512, 512, 3)
         x = tf.keras.layers.Activation(activation)(x)
 
     return Model(inputs, x, name='deeplabv3plus')
+
+
+def Decoder(inputs, skip):
+    skip_size = tf.keras.backend.int_shape(skip)
+
+    return 0
 
 
 def EntryFlowBlock(img_input, entry_block3_stride):
@@ -59,16 +67,16 @@ def EntryFlowBlock(img_input, entry_block3_stride):
     x = Xception_block(x, [128, 128, 128], "entry_flow_block1", skip_connection_type="conv",
                        last_stride=2, depth_activation=False, return_skip=False)
 
-    x = Xception_block(x, [256, 256, 256], "entry_flow_block2", skip_connection_type="conv",
-                       last_stride=2, depth_activation=False, return_skip=False)
+    x, skip = Xception_block(x, [256, 256, 256], "entry_flow_block2", skip_connection_type="conv",
+                             last_stride=2, depth_activation=False, return_skip=True)
 
     x = Xception_block(x, [728, 728, 728], "entry_flow_block3", skip_connection_type="conv",
                        last_stride=entry_block3_stride, depth_activation=False, return_skip=False)
 
-    return x
+    return x, skip
 
 
-def MiddleFlowBlock(inputs, middle_block_rate, block_number=16):
+def MiddleFlowBlocks(inputs, middle_block_rate, block_number=16):
     x = inputs
     for i in range(block_number):
         x = Xception_block(x, [728, 728, 728], f"middle_flow_unit_{i + 1}", skip_connection_type="sum",
@@ -79,7 +87,7 @@ def MiddleFlowBlock(inputs, middle_block_rate, block_number=16):
 
 def ExitFlowBlock(inputs, exit_block_rates):
     x = Xception_block(inputs, [728, 1024, 1024], "exit_flow_block1", skip_connection_type="conv",
-                       last_stride=2, rate=exit_block_rates[0], depth_activation=False, return_skip=False)
+                       last_stride=1, rate=exit_block_rates[0], depth_activation=False, return_skip=False)
 
     x = Xception_block(x, [1536, 1536, 2048], "exit_flow_block2", skip_connection_type=None,
                        last_stride=1, rate=exit_block_rates[1], depth_activation=True, return_skip=False)
