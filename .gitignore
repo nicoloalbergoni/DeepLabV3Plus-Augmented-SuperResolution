@@ -280,3 +280,7 @@ pip-selfcheck.json
 !.vscode/*.code-snippets
 
 # End of https://www.toptal.com/developers/gitignore/api/python,pycharm,visualstudiocode,virtualenv
+
+
+# PERSONAL 
+model/
