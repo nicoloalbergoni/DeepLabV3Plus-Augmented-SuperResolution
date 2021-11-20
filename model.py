@@ -1,10 +1,14 @@
+import os
 import tensorflow as tf
 from tensorflow.keras import Model
+from tensorflow.keras.utils import get_file
 from tensorflow.keras.layers import Conv2D, BatchNormalization, ReLU, ZeroPadding2D, Input, DepthwiseConv2D, Add, GlobalAveragePooling2D, Concatenate
 from tensorflow.keras.utils import get_source_inputs
 
+WEIGHTS_PATH_X = "https://github.com/bonlime/keras-deeplab-v3-plus/releases/download/1.1/deeplabv3_xception_tf_dim_ordering_tf_kernels.h5"
 
-def Deeplabv3(weights='pascal_voc', input_tensor=None, input_shape=(512, 512, 3), classes=21, OS=16, activation=None):
+
+def Deeplabv3(weights='pascal_voc', input_tensor=None, input_shape=(512, 512, 3), classes=21, OS=16, activation=None, load_weights=True):
 
     if not (weights in {'pascal_voc', None}):
         raise ValueError('The `weights` argument should be either '
@@ -32,7 +36,7 @@ def Deeplabv3(weights='pascal_voc', input_tensor=None, input_shape=(512, 512, 3)
     x = ExitFlowBlock(x, exit_block_rates)
     x = AtrousSpatialPyramidPooling(x, atrous_rates)
 
-    x = Decoder(x, skip)
+    x = Decoder(x, skip, img_shape=input_shape, classes=classes)
 
     # Ensure that the model takes into account
     # any potential predecessors of `input_tensor`.
@@ -44,13 +48,45 @@ def Deeplabv3(weights='pascal_voc', input_tensor=None, input_shape=(512, 512, 3)
     if activation in {'softmax', 'sigmoid'}:
         x = tf.keras.layers.Activation(activation)(x)
 
-    return Model(inputs, x, name='deeplabv3plus')
+    model = Model(inputs, x, name='deeplabv3plus')
+
+    if load_weights:
+        if not os.path.exists("model"):
+            os.mkdir("model")
+
+        weights_path = get_file('deeplabv3_xception_tf_dim_ordering_tf_kernels.h5',
+                                WEIGHTS_PATH_X,
+                                cache_dir="model",
+                                cache_subdir=""
+                                )
+
+        model.load_weights(weights_path, by_name=True)
+
+    return model
 
 
-def Decoder(inputs, skip):
+def Decoder(inputs, skip, img_shape=(512, 512, 3), classes=21):
+    # For input size of 512x512 skip_size is 128x128 as it corresponds to a x4 upsample of the encoder output feature
+    # which for OS 16 is 32x32
     skip_size = tf.keras.backend.int_shape(skip)
 
-    return 0
+    x = tf.keras.layers.Resizing(*skip_size[1:3], interpolation="bilinear")(inputs)
+
+    decoder_skip = Conv2D(48, (1, 1), padding="same", use_bias=False, name='feature_projection0')(skip)
+    decoder_skip = BatchNormalization(name='feature_projection0_BN', epsilon=1e-5)(decoder_skip)
+    decoder_skip = ReLU()(decoder_skip)
+
+    x = Concatenate()([x, decoder_skip])
+    x = SepConv_BN(x, 256, 'decoder_conv0',
+                   depth_activation=True, epsilon=1e-5)
+    x = SepConv_BN(x, 256, 'decoder_conv1',
+                   depth_activation=True, epsilon=1e-5)
+
+    # Final Convolution for class prediction and upsampling
+    x = Conv2D(classes, (1, 1), padding='same', name='logits_semantic')(x)
+    x = tf.keras.layers.Resizing(*img_shape[0:2], interpolation="bilinear")(x)
+
+    return x
 
 
 def EntryFlowBlock(img_input, entry_block3_stride):
@@ -76,8 +112,7 @@ def EntryFlowBlock(img_input, entry_block3_stride):
     return x, skip
 
 
-def MiddleFlowBlocks(inputs, middle_block_rate, block_number=16):
-    x = inputs
+def MiddleFlowBlocks(x, middle_block_rate, block_number=16):
     for i in range(block_number):
         x = Xception_block(x, [728, 728, 728], f"middle_flow_unit_{i + 1}", skip_connection_type="sum",
                            last_stride=1, rate=middle_block_rate, depth_activation=False, return_skip=False)
@@ -125,7 +160,7 @@ def AtrousSpatialPyramidPooling(inputs, atrous_rates):
     b3 = SepConv_BN(inputs, 256, "aspp3", stride=1, kernel_size=3,
                     rate=atrous_rates[2], depth_activation=True)
 
-    output = Concatenate()([b0, b1, b2, b3, image_pooling])
+    output = Concatenate()([image_pooling, b0, b1, b2, b3])
     output = Conv2D(256, (1, 1), padding='same', use_bias=False,
                     name="concat_projection")(output)
     output = BatchNormalization(
@@ -169,7 +204,7 @@ def Xception_block(inputs, filter_list, prefix, skip_connection_type, last_strid
     elif skip_connection_type == 'sum':
         outputs = Add()([residual, inputs])
 
-    elif skip_connection_type == None:
+    elif skip_connection_type is None:
         outputs = residual
 
     if return_skip:
