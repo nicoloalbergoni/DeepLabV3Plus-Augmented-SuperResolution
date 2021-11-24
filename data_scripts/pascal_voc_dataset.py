@@ -258,10 +258,10 @@ class PascalVOC2012Dataset():
         else:
             return im_padded, gt_padded
 
-    def load_dataset(self, is_training, tf_records_dir, batch_size):
+    def load_dataset(self, tf_records_dir, is_training=True,  batch_size=8):
         """Returns a TFRecordDataset for the requested dataset."""
-        data_path = os.path.join(tf_records_dir, 'segmentation_{}.tfrecords'.format(
-            'train' if is_training else 'val'))
+        data_path = os.path.join(
+            tf_records_dir, f"segmentation_{'train' if is_training else 'val'}.tfrecords")
         dataset = tf.data.TFRecordDataset(data_path)
 
         # Prefetches a batch at a time to smooth out the time taken to load input
@@ -270,14 +270,14 @@ class PascalVOC2012Dataset():
         dataset = dataset.map(self.parse_record)
 
         if is_training:
-            dataset = dataset.map(lambda im, gt, _: tuple(tf.compat.v1.py_func(self.transform_record,
-                                                                               [im, gt],
-                                                                               [im.dtype, tf.uint8])))
+            dataset = dataset.map(lambda im, gt, _: tuple(tf.numpy_function(self.transform_record,
+                                                                            [im, gt],
+                                                                            [im.dtype, tf.uint8])))
             dataset = dataset.shuffle(self.n_images['train'])
         else:
-            dataset = dataset.map(lambda im, gt, _: tuple(tf.compat.v1.py_func(self.pad_record,
-                                                                               [im, gt],
-                                                                               [im.dtype, tf.uint8])))
+            dataset = dataset.map(lambda im, gt, _: tuple(tf.numpy_function(self.pad_record,
+                                                                            [im, gt],
+                                                                            [im.dtype, tf.uint8])))
 
         return dataset.batch(batch_size)
 

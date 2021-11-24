@@ -1,6 +1,8 @@
 import numpy as np
 from PIL import Image
 from matplotlib import pyplot as plt
+import tensorflow as tf
+import tensorflow.keras.backend as K
 
 
 def preprocess_image(image, target_size_width=512, mean_subtraction_value=127.5):
@@ -8,7 +10,8 @@ def preprocess_image(image, target_size_width=512, mean_subtraction_value=127.5)
     w, h, _ = image.shape
     ratio = float(target_size_width) / np.max([w, h])
     new_size = (int(ratio * h), int(ratio * w))
-    resized_img = np.array(Image.fromarray(image.astype("uint8")).resize(new_size))
+    resized_img = np.array(Image.fromarray(
+        image.astype("uint8")).resize(new_size))
 
     # Normlization
     resized_img = (resized_img / mean_subtraction_value) - 1.
@@ -19,7 +22,8 @@ def preprocess_image(image, target_size_width=512, mean_subtraction_value=127.5)
 
     pad_size = ((0, pad_width), (0, pad_height), (0, 0))
 
-    resized_img = np.pad(resized_img, pad_size, constant_values=0, mode="constant")
+    resized_img = np.pad(resized_img, pad_size,
+                         constant_values=0, mode="constant")
 
     return resized_img, pad_width, pad_height
 
@@ -45,3 +49,38 @@ def plot_prediction(display_list, only_prediction=True, show_overlay=True):
         plt.axis("off")
 
     plt.show()
+
+
+def sparse_crossentropy_ignoring_last_label(y_true, y_pred):
+    nb_classes = K.int_shape(y_pred)[-1]
+    y_true = K.one_hot(
+        tf.cast(y_true[:, :, 0], tf.int32), nb_classes+1)[:, :, :-1]
+    return K.categorical_crossentropy(y_true, y_pred)
+
+
+def sparse_accuracy_ignoring_last_label(y_true, y_pred):
+    nb_classes = K.int_shape(y_pred)[-1]
+    y_pred = K.reshape(y_pred, (-1, nb_classes))
+    y_true = tf.cast(K.flatten(y_true), tf.int64)
+    legal_labels = ~K.equal(y_true, nb_classes)
+    return K.sum(tf.cast(legal_labels & K.equal(y_true, K.argmax(y_pred, axis=-1)), tf.float32)) / K.sum(tf.cast(legal_labels, tf.float32))
+
+
+def Jaccard(y_true, y_pred):
+    nb_classes = K.int_shape(y_pred)[-1]
+    iou = []
+    pred_pixels = K.argmax(y_pred, axis=-1)
+    for i in range(0, nb_classes):  # exclude first label (background) and last label (void)
+        true_labels = K.equal(y_true[:, :, 0], i)
+        pred_labels = K.equal(pred_pixels, i)
+        inter = tf.cast(true_labels & pred_labels, tf.int32)
+        union = tf.cast(true_labels | pred_labels, tf.int32)
+        legal_batches = K.sum(tf.cast(true_labels, tf.int32), axis=1) > 0
+        ious = K.sum(inter, axis=1)/K.sum(union, axis=1)
+        iou.append(K.mean(tf.gather(ious, indices=tf.where(legal_batches))))
+        # iou.append(K.mean(ious[legal_batches]))
+
+    iou = tf.stack(iou)
+    legal_labels = ~tf.math.is_nan(iou)
+    iou = iou[legal_labels]
+    return K.mean(iou)
