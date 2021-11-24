@@ -1,6 +1,8 @@
 import os
 import sys
 import zipfile
+import tarfile
+import shutil
 import urllib.request
 
 
@@ -30,15 +32,24 @@ def download_dataset(dataset_url, dest_folder):
     return filepath
 
 
-def extract_zip_file(filepath, dest_folder):
+def extract_file(filepath, dest_folder, is_extracted="./data/VOC2101"):
 
     # TODO: Find a better way to understand when to skip unzip even for different datasets
-    if os.path.exists(os.path.join(dest_folder, "VOC2012")):
+    if os.path.exists(is_extracted):
         print("VOC dataset already extracted")
         return
 
-    print("Extracting zip file...")
-    with zipfile.ZipFile(filepath, 'r') as zip_ref:
-        zip_ref.extractall(dest_folder)
+    file_type = filepath.split(".")[-1]
 
-    print("Finished extraction")
+    if file_type == "zip":
+        print("Extracting zip file...")
+        with zipfile.ZipFile(filepath, 'r') as zip_ref:
+            zip_ref.extractall(dest_folder)
+        print("Finished extraction")
+
+    elif file_type == "tar":
+        print('Extracting tarball...')
+        tarfile.open(filepath, 'r').extractall(dest_folder)
+        print('Finished extracting')
+    else:
+        raise ValueError("The specified file is not a zip or a tar file")

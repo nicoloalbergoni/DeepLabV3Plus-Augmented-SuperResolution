@@ -13,9 +13,9 @@
 # limitations under the License.
 # ==============================================================================
 
-import tqdm
 import shutil
 import os.path
+from tqdm import tqdm
 from datetime import datetime
 import numpy as np
 import matplotlib.pyplot as plt
@@ -30,10 +30,9 @@ from data_scripts.image_utils import (imread, imwrite, bytesread,
 class PascalVOC2012Dataset():
     """Dataset class for PASCAL VOC 2012."""
 
-    def __init__(self, data_dir, augmentation_params):
+    def __init__(self, augmentation_params):
         super().__init__()
         self.augmentation_params = augmentation_params
-        self.data_dir = data_dir
         # Image is padded to obtain a shape divisible by 32.
         self.image_shape = (512, 512)
         self.n_classes = 21  # Excluding the ignore/void class
@@ -44,6 +43,7 @@ class PascalVOC2012Dataset():
             'train': 1464,
             'val': 1449
         }
+
         self.cmap = self.color_map()
         assert len(self.cmap) == (self.n_classes +
                                   1), 'Invalid number of colors in cmap'
@@ -110,7 +110,7 @@ class PascalVOC2012Dataset():
         cmap = np.vstack([cmap[:self.n_classes], cmap[-1].reshape(1, 3)])
         return cmap
 
-    def get_basenames(self, filename):
+    def get_basenames(self, filename, dataset_path):
         """
         Obtains the list of image base names that have been labelled for semantic segmentation.
         Images are stored in JPEG format, and segmentation ground truth in PNG format.
@@ -120,8 +120,8 @@ class PascalVOC2012Dataset():
         :return: The list of image base names for either the training, validation, or test set.
         """
         assert filename in ('train', 'val', 'test')
-        filename = os.path.join(
-            self.data_dir, 'ImageSets', 'Segmentation', filename + '.txt')
+        filename = os.path.join(dataset_path, "ImageSets",
+                                "Segmentation", filename + '.txt')
         return [line.rstrip() for line in open(filename)]
 
     def export_sparse_encoding(self, filename, dataset_path):
@@ -133,7 +133,7 @@ class PascalVOC2012Dataset():
         :return: None
         """
         # Load the list of image base names
-        basenames = self.get_basenames(filename)
+        basenames = self.get_basenames(filename, dataset_path)
 
         gt_path = os.path.join(dataset_path, 'SegmentationClass')
         gt_sparse_path = os.path.join(dataset_path, 'SegmentationSparseClass')
@@ -145,13 +145,13 @@ class PascalVOC2012Dataset():
         else:
             print('Sparse labels folder already exists')
 
-        for basename in tqdm(basenames):
+        for basename in basenames:
             gt = imread(os.path.join(gt_path, basename + '.png'))
             gt = colors2labels(gt, self.cmap, one_hot=False)
             gt = np.dstack([gt, np.copy(gt), np.copy(gt)])
             imwrite(os.path.join(gt_sparse_path, basename + '.png'), gt)
 
-    def export_tfrecord(self, filename, out_dir, tfrecord_filename):
+    def export_tfrecord(self, filename, dataset_path, tf_record_dest_dir, tfrecord_filename):
         """
         Exports a semantic image segmentation dataset to TFRecords.
         Images are stored in JPEG format, and segmentation ground truth in PNG format.
@@ -161,24 +161,24 @@ class PascalVOC2012Dataset():
         :return: the list of image base names for either the training or validation image set
         """
         print('Loading images...')
-        basenames = self.get_basenames(filename)
+        basenames = self.get_basenames(filename, dataset_path)
 
         # Create folder for TF records
-        tfrecords_path = os.path.join(out_dir, 'TFRecords')
-        if not os.path.exists(tfrecords_path):
+        if not os.path.exists(tf_record_dest_dir):
             print('Creating TFRecords folder')
-            os.makedirs(tfrecords_path)
+            os.makedirs(tf_record_dest_dir)
         else:
             print('TFRecords folder already exists')
 
         im_set, gt_set, shape_set = [], [], []
+        print("Parsing Images...")
         for basename in tqdm(basenames):
             # Save image in raw bytes format
             im = bytesread(os.path.join(
-                self.data_dir, 'JPEGImages', basename + '.jpg'))
+                dataset_path, 'JPEGImages', basename + '.jpg'))
             # Save ground truth as a ndarray
             gt = imread(os.path.join(
-                self.data_dir, 'SegmentationClass', basename + '.png'))
+                dataset_path, 'SegmentationClass', basename + '.png'))
             shape_set.append(gt.shape)
             gt = colors2labels(gt, self.cmap)
             im_set.append(im)
@@ -186,7 +186,7 @@ class PascalVOC2012Dataset():
 
         print('Saving to ' + tfrecord_filename)
         self._export(im_set, gt_set, shape_set, os.path.join(
-            tfrecords_path, tfrecord_filename))
+            tf_record_dest_dir, tfrecord_filename))
 
     def _export(self, im_set, gt_set, shape_set, filename):
         def _int64_feature(value):
@@ -196,7 +196,7 @@ class PascalVOC2012Dataset():
             return tf.train.Feature(bytes_list=tf.train.BytesList(value=[value]))
 
         with tf.io.TFRecordWriter(filename) as writer:
-            for im, gt, shape in list(zip(im_set, gt_set, shape_set)):
+            for im, gt, shape in tqdm(list(zip(im_set, gt_set, shape_set))):
                 example = tf.train.Example(
                     features=tf.train.Features(
                         feature={
@@ -258,10 +258,10 @@ class PascalVOC2012Dataset():
         else:
             return im_padded, gt_padded
 
-    def load_dataset(self, is_training, tf_record_dir, batch_size):
+    def load_dataset(self, is_training, tf_records_dir, batch_size):
         """Returns a TFRecordDataset for the requested dataset."""
-        data_path = os.path.join(tf_record_dir,
-                                 'segmentation_{}.tfrecords'.format('train' if is_training else 'val'))
+        data_path = os.path.join(tf_records_dir, 'segmentation_{}.tfrecords'.format(
+            'train' if is_training else 'val'))
         dataset = tf.data.TFRecordDataset(data_path)
 
         # Prefetches a batch at a time to smooth out the time taken to load input

@@ -3,20 +3,18 @@ from matplotlib import pyplot as plt
 from data_scripts.pascal_voc_dataset import PascalVOC2012Dataset
 
 BASE_DIR = os.getcwd()
-DATASET_DIR = os.path.join(BASE_DIR, "data")
-PASCAL_ROOT = os.path.join(DATASET_DIR, "VOC2012")
-TF_RECORD_DIR = os.path.join(DATASET_DIR, "TFRecords")
+DATA_DIR = os.path.join(BASE_DIR, "data")
+PASCAL_ROOT = os.path.join(DATA_DIR, "VOCdevkit", "VOC2012")
+TF_RECORD_DIR = os.path.join(DATA_DIR, "TFRecords")
 
 AUGMENTATION_PARAMS = {'saturation_range': (-20, 20), 'value_range': (-20, 20),
                        'brightness_range': None, 'contrast_range': None, 'blur_params': None,
                        'flip_lr': True, 'rotation_range': (-10, 10), 'shift_range': (32, 32),
                        'zoom_range': (0.5, 2.0), 'ignore_label': 21}
 
-dataset_obj = PascalVOC2012Dataset(
-    PASCAL_ROOT, augmentation_params=AUGMENTATION_PARAMS)
+dataset_obj = PascalVOC2012Dataset(augmentation_params=AUGMENTATION_PARAMS)
 
 dataset = dataset_obj.load_dataset(True, TF_RECORD_DIR, 16)
-print("v")
 
 
 def display(display_list):
