@@ -2,13 +2,13 @@ import os
 import tensorflow as tf
 from tensorflow.keras import Model
 from tensorflow.keras.utils import get_file
-from tensorflow.keras.layers import Conv2D, BatchNormalization, ReLU, ZeroPadding2D, Input, DepthwiseConv2D, Add, GlobalAveragePooling2D, Concatenate
+from tensorflow.keras.layers import Conv2D, BatchNormalization, ReLU, ZeroPadding2D, Input, DepthwiseConv2D, Add, GlobalAveragePooling2D, Concatenate, Activation, Reshape
 from tensorflow.keras.utils import get_source_inputs
 
 WEIGHTS_PATH_X = "https://github.com/bonlime/keras-deeplab-v3-plus/releases/download/1.1/deeplabv3_xception_tf_dim_ordering_tf_kernels.h5"
 
 
-def Deeplabv3(weights='pascal_voc', input_tensor=None, input_shape=(512, 512, 3), classes=21, OS=16, activation=None, load_weights=True):
+def Deeplabv3(weights='pascal_voc', input_tensor=None, input_shape=(512, 512, 3), classes=21, OS=16, activation=None, load_weights=True, infer=False):
 
     if not (weights in {'pascal_voc', None}):
         raise ValueError('The `weights` argument should be either '
@@ -45,8 +45,11 @@ def Deeplabv3(weights='pascal_voc', input_tensor=None, input_shape=(512, 512, 3)
     else:
         inputs = img_input
 
+    if not infer:
+        x = Reshape((input_shape[0] * input_shape[1], classes))(x)
+
     if activation in {'softmax', 'sigmoid'}:
-        x = tf.keras.layers.Activation(activation)(x)
+        x = Activation(activation)(x)
 
     model = Model(inputs, x, name='deeplabv3plus')
 
@@ -70,10 +73,13 @@ def Decoder(inputs, skip, img_shape=(512, 512, 3), classes=21):
     # which for OS 16 is 32x32
     skip_size = tf.keras.backend.int_shape(skip)
 
-    x = tf.keras.layers.Resizing(*skip_size[1:3], interpolation="bilinear")(inputs)
+    x = tf.keras.layers.Resizing(
+        *skip_size[1:3], interpolation="bilinear")(inputs)
 
-    decoder_skip = Conv2D(48, (1, 1), padding="same", use_bias=False, name='feature_projection0')(skip)
-    decoder_skip = BatchNormalization(name='feature_projection0_BN', epsilon=1e-5)(decoder_skip)
+    decoder_skip = Conv2D(48, (1, 1), padding="same",
+                          use_bias=False, name='feature_projection0')(skip)
+    decoder_skip = BatchNormalization(
+        name='feature_projection0_BN', epsilon=1e-5)(decoder_skip)
     decoder_skip = ReLU()(decoder_skip)
 
     x = Concatenate()([x, decoder_skip])

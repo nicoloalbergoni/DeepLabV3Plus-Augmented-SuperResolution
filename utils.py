@@ -52,10 +52,15 @@ def plot_prediction(display_list, only_prediction=True, show_overlay=True):
 
 
 def sparse_crossentropy_ignoring_last_label(y_true, y_pred):
+    print(y_pred.numpy().shape)
+    print(y_true.numpy().shape)
+
     nb_classes = K.int_shape(y_pred)[-1]
     y_true = K.one_hot(
-        tf.cast(y_true[:, :, 0], tf.int32), nb_classes+1)[:, :, :-1]
-    return K.categorical_crossentropy(y_true, y_pred)
+        tf.cast(y_true[:, :, 0], tf.int32), nb_classes + 1)[:, :, :-1]
+
+    print(y_true.numpy().shape)
+    return K.categorical_crossentropy(y_true, y_pred, from_logits=False)
 
 
 def sparse_accuracy_ignoring_last_label(y_true, y_pred):
@@ -70,6 +75,7 @@ def Jaccard(y_true, y_pred):
     nb_classes = K.int_shape(y_pred)[-1]
     iou = []
     pred_pixels = K.argmax(y_pred, axis=-1)
+    print(pred_pixels.numpy().shape)
     for i in range(0, nb_classes):  # exclude first label (background) and last label (void)
         true_labels = K.equal(y_true[:, :, 0], i)
         pred_labels = K.equal(pred_pixels, i)

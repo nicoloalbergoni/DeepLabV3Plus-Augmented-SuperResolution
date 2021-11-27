@@ -1,5 +1,6 @@
 import os
 from data_scripts.data_utils import download_dataset, extract_file
+from data_scripts import remove_gt_colormap
 from data_scripts.pascal_voc_dataset import PascalVOC2012Dataset
 
 
@@ -17,12 +18,9 @@ def main():
 
     extract_file(filepath, DATA_DIR, is_extracted=PASCAL_ROOT)
 
-    # SEG_FOLDER = os.path.join(PASCAL_ROOT, "SegmentationClass")
-    # SEMANTIC_SEG_FOLDER = os.path.join(PASCAL_ROOT, "SegmentationClassRaw")
-    # remove_gt_colormap(SEG_FOLDER, SEMANTIC_SEG_FOLDER)
-    # IMAGE_FOLDER = os.path.join(PASCAL_ROOT, "JPEGImages")
-    # LIST_FOLDER = os.path.join(PASCAL_ROOT, "ImageSets", "Segmentation")
-    # build_tfrecords(LIST_FOLDER, IMAGE_FOLDER, SEMANTIC_SEG_FOLDER, TF_RECORDS_DIR)
+    SEG_FOLDER = os.path.join(PASCAL_ROOT, "SegmentationClass")
+    SEMANTIC_SEG_FOLDER = os.path.join(PASCAL_ROOT, "SegmentationClassRaw")
+    remove_gt_colormap(SEG_FOLDER, SEMANTIC_SEG_FOLDER)
 
     dataset = PascalVOC2012Dataset(augmentation_params=None)
     train_basenames = dataset.get_basenames('train', PASCAL_ROOT)

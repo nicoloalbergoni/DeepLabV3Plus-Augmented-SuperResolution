@@ -43,7 +43,7 @@ losses = sparse_crossentropy_ignoring_last_label
 metrics = [Jaccard, sparse_accuracy_ignoring_last_label]
 
 model.compile(optimizer=Adam(learning_rate=7e-4, epsilon=1e-8, decay=1e-6), sample_weight_mode="temporal",
-              loss=losses, metrics=metrics)
+              loss=losses, metrics=metrics, run_eagerly=True)
 
 
 EPOCHS = 30
