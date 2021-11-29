@@ -46,7 +46,7 @@ def Deeplabv3(weights='pascal_voc', input_tensor=None, input_shape=(512, 512, 3)
     else:
         inputs = img_input
 
-    if not reshape_outputs:
+    if reshape_outputs:
         x = Reshape((input_shape[0] * input_shape[1], classes))(x)
 
     if activation in {'softmax', 'sigmoid'}:
