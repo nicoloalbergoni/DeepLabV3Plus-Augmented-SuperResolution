@@ -10,7 +10,7 @@ AUTOTUNE = tf.data.experimental.AUTOTUNE
 class DataLoader(object):
     """A TensorFlow Dataset API based loader for semantic segmentation problems."""
 
-    def __init__(self, root_folder: List[str], image_size: Tuple[int], mode: str,
+    def __init__(self, root_folder: List[str], image_size: Tuple[int], mode: str, reshape_masks: bool = False,
                  channels: Tuple[int] = (3, 3), crop_percent: float = None, seed: int = None,
                  augment: bool = True, compose: bool = False, one_hot_encoding: bool = False, palette=None):
         """
@@ -30,6 +30,7 @@ class DataLoader(object):
                   the RNG in the data pipeline.
         """
         self.root_folder = root_folder
+        self.reshape_masks = reshape_masks
         self.mode = mode
         self.image_paths = self._get_img_paths()
         self.palette = palette
@@ -135,6 +136,10 @@ class DataLoader(object):
         """
         image = tf.image.resize(image, self.image_size)
         mask = tf.image.resize(mask, self.image_size, method="nearest")
+
+        if self.reshape_masks:
+            mask = tf.reshape(
+                mask, (self.image_size[0] * self.image_size[1], self.channels[-1]))
 
         return image, mask
 

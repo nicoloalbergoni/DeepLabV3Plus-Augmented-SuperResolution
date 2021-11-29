@@ -103,7 +103,7 @@ def main():
     val_dataset = val_dataset.prefetch(buffer_size=AUTOTUNE)
 
     model = Deeplabv3(input_shape=(512, 512, 3),
-                      classes=21, OS=16, load_weights=True, activation="softmax", infer=False)
+                      classes=21, OS=16, load_weights=True, activation="softmax", reshape_outputs=False)
 
     losses = sparse_crossentropy_ignoring_last_label
     #losses = SparseCategoricalCrossentropy(from_logits=True)

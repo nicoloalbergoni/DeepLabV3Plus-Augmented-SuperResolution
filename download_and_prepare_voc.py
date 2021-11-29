@@ -1,6 +1,6 @@
 import os
 from data_scripts.data_utils import download_dataset, extract_file
-from data_scripts import remove_gt_colormap
+from data_scripts.remove_gt_colormap import remove_gt_colormap
 from data_scripts.pascal_voc_dataset import PascalVOC2012Dataset
 
 

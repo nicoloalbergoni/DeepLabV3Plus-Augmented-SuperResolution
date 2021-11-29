@@ -40,28 +40,25 @@ def plot_prediction(display_list, only_prediction=True, show_overlay=True):
             plt.title(title[-1])
         else:
             plt.title(title[i])
-        plt.imshow(display_list[i])
+        plt.imshow(tf.keras.preprocessing.image.array_to_img(display_list[i]))
         plt.axis('off')
 
     if show_overlay:
         plt.subplot(1, len(display_list) + 1, len(display_list) + 1)
         plt.title("Overlay")
-        plt.imshow(display_list[0])
-        plt.imshow(display_list[-1], alpha=0.5)
+        plt.imshow(tf.keras.preprocessing.image.array_to_img(display_list[0]))
+        plt.imshow(tf.keras.preprocessing.image.array_to_img(
+            display_list[-1]), alpha=0.5)
         plt.axis("off")
 
     plt.show()
 
 
 def sparse_crossentropy_ignoring_last_label(y_true, y_pred):
-    print(y_pred.numpy().shape)
-    print(y_true.numpy().shape)
-
     nb_classes = K.int_shape(y_pred)[-1]
     y_true = K.one_hot(
         tf.cast(y_true[:, :, 0], tf.int32), nb_classes + 1)[:, :, :-1]
 
-    print(y_true.numpy().shape)
     return K.categorical_crossentropy(y_true, y_pred, from_logits=False)
 
 

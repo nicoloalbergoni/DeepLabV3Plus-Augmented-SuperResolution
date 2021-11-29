@@ -8,7 +8,7 @@ from tensorflow.keras.utils import get_source_inputs
 WEIGHTS_PATH_X = "https://github.com/bonlime/keras-deeplab-v3-plus/releases/download/1.1/deeplabv3_xception_tf_dim_ordering_tf_kernels.h5"
 
 
-def Deeplabv3(weights='pascal_voc', input_tensor=None, input_shape=(512, 512, 3), classes=21, OS=16, activation=None, load_weights=True, infer=False):
+def Deeplabv3(weights='pascal_voc', input_tensor=None, input_shape=(512, 512, 3), classes=21, OS=16, activation=None, load_weights=True, reshape_outputs=False):
 
     if not (weights in {'pascal_voc', None}):
         raise ValueError('The `weights` argument should be either '
@@ -36,7 +36,8 @@ def Deeplabv3(weights='pascal_voc', input_tensor=None, input_shape=(512, 512, 3)
     x = ExitFlowBlock(x, exit_block_rates)
     x = AtrousSpatialPyramidPooling(x, atrous_rates)
 
-    x = Decoder(x, skip, img_shape=input_shape, classes=classes)
+    x = Decoder(x, skip, img_shape=input_shape,
+                classes=classes, weights=weights)
 
     # Ensure that the model takes into account
     # any potential predecessors of `input_tensor`.
@@ -45,7 +46,7 @@ def Deeplabv3(weights='pascal_voc', input_tensor=None, input_shape=(512, 512, 3)
     else:
         inputs = img_input
 
-    if not infer:
+    if not reshape_outputs:
         x = Reshape((input_shape[0] * input_shape[1], classes))(x)
 
     if activation in {'softmax', 'sigmoid'}:
@@ -68,7 +69,7 @@ def Deeplabv3(weights='pascal_voc', input_tensor=None, input_shape=(512, 512, 3)
     return model
 
 
-def Decoder(inputs, skip, img_shape=(512, 512, 3), classes=21):
+def Decoder(inputs, skip, img_shape=(512, 512, 3), classes=21, weights='pascal_voc'):
     # For input size of 512x512 skip_size is 128x128 as it corresponds to a x4 upsample of the encoder output feature
     # which for OS 16 is 32x32
     skip_size = tf.keras.backend.int_shape(skip)
@@ -89,7 +90,12 @@ def Decoder(inputs, skip, img_shape=(512, 512, 3), classes=21):
                    depth_activation=True, epsilon=1e-5)
 
     # Final Convolution for class prediction and upsampling
-    x = Conv2D(classes, (1, 1), padding='same', name='logits_semantic')(x)
+    if classes == 21 and weights == 'pascal_voc':
+        last_layer_name = 'logits_semantic'
+    else:
+        last_layer_name = 'custom_logits_semantic'
+
+    x = Conv2D(classes, (1, 1), padding='same', name=last_layer_name)(x)
     x = tf.keras.layers.Resizing(*img_shape[0:2], interpolation="bilinear")(x)
 
     return x
