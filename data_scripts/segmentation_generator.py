@@ -1,40 +1,23 @@
-import glob
 import os
 import random
 import numpy as np
 import cv2
+from sklearn.utils import class_weight
+from utils import _random_crop
+from sklearn.utils.class_weight import compute_class_weight
 from tensorflow.keras.utils import Sequence
+
+clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
 
 
 class SegmentationGenerator(Sequence):
 
-    def __init__(self, folder='data/VOC2012', mode='train', n_classes=21, batch_size=1, resize_shape=None,
-                 validation_split=.1, seed=7, crop_shape=(640, 320), horizontal_flip=True, blur=0,
-                 vertical_flip=0, brightness=0.1, rotation=5.0, zoom=0.1, do_ahisteq=True):
+    def __init__(self, root_folder='data/VOC2012', mode='train', n_classes=21, batch_size=1, resize_shape=None,
+                 seed=7, crop_shape=None, horizontal_flip=True, blur=0, vertical_flip=0, brightness=0.1, rotation=5.0, zoom=0.1, do_ahisteq=True):
 
+        self.root_folder = root_folder
         self.blur = blur
         self.histeq = do_ahisteq
-        self.image_path_list = sorted(
-            glob.glob(os.path.join(folder, 'JPEGImages', '*')))
-        self.label_path_list = sorted(
-            glob.glob(os.path.join(folder, 'SegmentationClassRaw', '*')))
-
-        np.random.seed(seed)
-
-        n_images_to_select = round(
-            len(self.image_path_list) * validation_split)
-        x = np.random.permutation(len(self.image_path_list))[
-            :n_images_to_select]
-        if mode == 'train':
-            x = np.setxor1d(x, np.arange(len(self.image_path_list)))
-
-        self.image_path_list = [self.image_path_list[j] for j in x]
-        self.label_path_list = [self.label_path_list[j] for j in x]
-
-        if mode == 'test':
-            self.image_path_list = sorted(
-                glob.glob(os.path.join(folder, 'JPEGImages', 'test', '*')))[:100]
-
         self.mode = mode
         self.n_classes = n_classes
         self.batch_size = batch_size
@@ -45,41 +28,60 @@ class SegmentationGenerator(Sequence):
         self.brightness = brightness
         self.rotation = rotation
         self.zoom = zoom
+
+        self.image_path_list = sorted(self._get_img_paths())
+
+        np.random.seed(seed)
+
         # Preallocate memory
         if self.crop_shape:
             self.X = np.zeros(
                 (batch_size, crop_shape[1], crop_shape[0], 3), dtype='float32')
             self.SW = np.zeros(
-                (batch_size, crop_shape[1]*crop_shape[0]), dtype='float32')
+                (batch_size, crop_shape[1] * crop_shape[0]), dtype='float32')
             self.Y = np.zeros(
-                (batch_size, crop_shape[1]*crop_shape[0], 1), dtype='float32')
+                (batch_size, crop_shape[1] * crop_shape[0], 1), dtype='float32')
             self.F = np.zeros(
-                (batch_size, crop_shape[1]*crop_shape[0], 1), dtype='float32')
+                (batch_size, crop_shape[1] * crop_shape[0], 1), dtype='float32')
             self.F_SW = np.zeros(
-                (batch_size, crop_shape[1]*crop_shape[0]), dtype='float32')
+                (batch_size, crop_shape[1] * crop_shape[0]), dtype='float32')
         elif self.resize_shape:
             self.X = np.zeros(
                 (batch_size, resize_shape[1], resize_shape[0], 3), dtype='float32')
             self.SW = np.zeros(
-                (batch_size, resize_shape[1]*resize_shape[0]), dtype='float32')
+                (batch_size, resize_shape[1] * resize_shape[0]), dtype='float32')
             self.Y = np.zeros(
-                (batch_size, resize_shape[1]*resize_shape[0], 1), dtype='float32')
+                (batch_size, resize_shape[1] * resize_shape[0], 1), dtype='float32')
             self.F = np.zeros(
-                (batch_size, resize_shape[1]*resize_shape[0], 1), dtype='float32')
+                (batch_size, resize_shape[1] * resize_shape[0], 1), dtype='float32')
             self.F_SW = np.zeros(
-                (batch_size, resize_shape[1]*resize_shape[0]), dtype='float32')
+                (batch_size, resize_shape[1] * resize_shape[0]), dtype='float32')
         else:
             raise Exception('No image dimensions specified!')
+
+    def _get_img_paths(self):
+        """
+        Obtains the list of image base names that have been labelled for semantic segmentation.
+        Images are stored in JPEG format, and segmentation ground truth in PNG format.
+
+        :param filename: The dataset name, either 'train', 'val' or 'test'.
+        :param dataset_path: The root path of the dataset.
+        :return: The list of image base names for either the training, validation, or test set.
+        """
+        filename = os.path.join(self.root_folder, "ImageSets", "Segmentation",
+                                "train.txt" if self.mode == "train" else "val.txt")
+        return [os.path.join(self.root_folder, "JPEGImages", line.rstrip() + ".jpg") for line in open(filename)]
 
     def __len__(self):
         return len(self.image_path_list) // self.batch_size
 
     def __getitem__(self, i):
 
-        for n, (image_path, label_path) in enumerate(zip(self.image_path_list[i*self.batch_size:(i+1)*self.batch_size],
-                                                         self.label_path_list[i*self.batch_size:(i+1)*self.batch_size])):
+        for n, image_path in enumerate(self.image_path_list[i * self.batch_size:(i + 1) * self.batch_size]):
 
             image = cv2.imread(image_path, 1)
+            label_path = image_path.replace(
+                "JPEGImages", "SegmentationClass").replace("jpg", "png")
             label = cv2.imread(label_path, 0)
             labels = np.unique(label)
 
@@ -134,55 +136,59 @@ class SegmentationGenerator(Sequence):
                 label[label == j] = self.n_classes
 
             y = label.flatten()
-            y[y > (self.n_classes-1)] = self.n_classes
+            y[y > (self.n_classes - 1)] = self.n_classes
 
-            self.Y[n] = np.expand_dims(y, -1)
-            # get all pixels that aren't background
-            self.F[n] = (self.Y[n] != 0).astype('float32')
-            # get all pixels (bg and foregroud) that aren't void
-            valid_pixels = self.F[n][self.Y[n] != self.n_classes]
-            u_classes = np.unique(valid_pixels)
-            class_weights = class_weight.compute_class_weight(
-                'balanced', u_classes, valid_pixels)
-            class_weights = {class_id: w for class_id,
-                             w in zip(u_classes, class_weights)}
-            if len(class_weights) == 1:  # no bg\no fg
-                if 1 in u_classes:
-                    class_weights[0] = 0.
-                else:
-                    class_weights[1] = 0.
-            elif not len(class_weights):
-                class_weights[0] = 0.
-                class_weights[1] = 0.
-
-            sw_valid = np.ones(y.shape)
-            # background weights
-            np.putmask(sw_valid, self.Y[n] == 0, class_weights[0])
-            # foreground wegihts
-            np.putmask(sw_valid, self.F[n], class_weights[1])
-            np.putmask(sw_valid, self.Y[n] == self.n_classes, 0)
-            self.F_SW[n] = sw_valid
             self.X[n] = image
+            self.Y[n] = np.expand_dims(y, -1)
 
-            # Create adaptive pixels weights
-            filt_y = y[y != self.n_classes]
-            u_classes = np.unique(filt_y)
-            if len(u_classes):
-                class_weights = class_weight.compute_class_weight(
-                    'balanced', u_classes, filt_y)
-                class_weights = {class_id: w for class_id,
-                                 w in zip(u_classes, class_weights)}
-            class_weights[self.n_classes] = 0.
-            for yy in u_classes:
-                np.putmask(self.SW[n], y == yy, class_weights[yy])
+        return self.X, self.Y
 
-            np.putmask(self.SW[n], y == self.n_classes, 0)
+        #     # get all pixels that aren't background
+        #     self.F[n] = (self.Y[n] != 0).astype('float32')
+        #     # get all pixels (bg and foregroud) that aren't void
+        #     valid_pixels = self.F[n][self.Y[n] != self.n_classes]
+        #     u_classes = np.unique(valid_pixels)
+        #     class_weights = compute_class_weight(
+        #         class_weight='balanced', classes=u_classes, y=valid_pixels)
+        #     class_weights = {class_id: w for class_id,
+        #                      w in zip(u_classes, class_weights)}
+        #     if len(class_weights) == 1:  # no bg\no fg
+        #         if 1 in u_classes:
+        #             class_weights[0] = 0.
+        #         else:
+        #             class_weights[1] = 0.
+        #     elif not len(class_weights):
+        #         class_weights[0] = 0.
+        #         class_weights[1] = 0.
 
-        sample_dict = {'pred_mask': self.SW}
-        return self.X, self.Y, sample_dict
+        #     sw_valid = np.ones(y.shape)
+        #     # background weights
+        #     np.putmask(sw_valid, self.Y[n] == 0, class_weights[0])
+        #     # foreground wegihts
+        #     np.putmask(sw_valid, self.F[n], class_weights[1])
+        #     np.putmask(sw_valid, self.Y[n] == self.n_classes, 0)
+        #     self.F_SW[n] = sw_valid
+        #     self.X[n] = image
+
+        #     # Create adaptive pixels weights
+        #     filt_y = y[y != self.n_classes]
+        #     u_classes = np.unique(filt_y)
+        #     if len(u_classes):
+        #         class_weights = compute_class_weight(
+        #             class_weight='balanced', classes=u_classes, y=filt_y)
+        #         class_weights = {class_id: w for class_id,
+        #                          w in zip(u_classes, class_weights)}
+        #     class_weights[self.n_classes] = 0.
+        #     for yy in u_classes:
+        #         np.putmask(self.SW[n], y == yy, class_weights[yy])
+
+        #     np.putmask(self.SW[n], y == self.n_classes, 0)
+
+        # sample_dict = {'pred_mask': self.SW}
+        # return self.X, self.Y, sample_dict
 
     def on_epoch_end(self):
         # Shuffle dataset for next epoch
-        c = list(zip(self.image_path_list, self.label_path_list))
+        c = list(self.image_path_list)
         random.shuffle(c)
-        self.image_path_list, self.label_path_list = zip(*c)
+        self.image_path_list = c

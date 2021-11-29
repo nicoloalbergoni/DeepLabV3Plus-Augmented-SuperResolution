@@ -1,3 +1,5 @@
+import cv2
+import random
 import numpy as np
 from PIL import Image
 from matplotlib import pyplot as plt
@@ -90,3 +92,18 @@ def Jaccard(y_true, y_pred):
     legal_labels = ~tf.math.is_nan(iou)
     iou = iou[legal_labels]
     return K.mean(iou)
+
+
+def _random_crop(image, label, crop_shape):
+    if (image.shape[0] != label.shape[0]) or (image.shape[1] != label.shape[1]):
+        raise Exception('Image and label must have the same dimensions!')
+
+    if (crop_shape[0] < image.shape[1]) and (crop_shape[1] < image.shape[0]):
+        x = random.randrange(image.shape[1]-crop_shape[0])
+        y = random.randrange(image.shape[0]-crop_shape[1])
+
+        return image[y:y+crop_shape[1], x:x+crop_shape[0], :], label[y:y+crop_shape[1], x:x+crop_shape[0]]
+    else:
+        image = cv2.resize(image, crop_shape)
+        label = cv2.resize(label, crop_shape, interpolation=cv2.INTER_NEAREST)
+        return image, label
