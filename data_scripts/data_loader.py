@@ -1,5 +1,3 @@
-from typing import List, Tuple
-
 import tensorflow as tf
 import random
 import os
@@ -10,9 +8,9 @@ AUTOTUNE = tf.data.experimental.AUTOTUNE
 class DataLoader(object):
     """A TensorFlow Dataset API based loader for semantic segmentation problems."""
 
-    def __init__(self, root_folder: List[str], image_size: Tuple[int], mode: str, reshape_masks: bool = False,
-                 channels: Tuple[int] = (3, 3), crop_percent: float = None, seed: int = None,
-                 augment: bool = True, compose: bool = False, one_hot_encoding: bool = False, palette=None):
+    def __init__(self, root_folder, image_size=(512, 512), mode="train", reshape_masks=False,
+                 channels=(3, 3), crop_percent=None, seed=None,
+                 augment=True, compose=False, one_hot_encoding=False, palette=None):
         """
         Initializes the data loader object
         Args:
@@ -38,6 +36,8 @@ class DataLoader(object):
         self.augment = augment
         self.compose = compose
         self.one_hot_encoding = one_hot_encoding
+        self.channels = channels
+
         if crop_percent is not None:
             if 0.0 < crop_percent <= 1.0:
                 self.crop_percent = tf.constant(crop_percent, tf.float32)
@@ -49,7 +49,7 @@ class DataLoader(object):
                                   integer between 0 and 100, or a float between 0 and 1.0")
         else:
             self.crop_percent = None
-        self.channels = channels
+
         if seed is None:
             self.seed = random.randint(0, 1000)
         else:
@@ -143,6 +143,11 @@ class DataLoader(object):
 
         return image, mask
 
+    def _normalize(self, image, mask):
+        image = tf.cast(image, tf.float32) / 255.0
+
+        return image, mask
+
     def _parse_data(self, image_path):
         """
         Reads image and mask files depending on
@@ -154,10 +159,10 @@ class DataLoader(object):
         mask_path = tf.strings.regex_replace(mask_path, "jpg", "png")
         mask_content = tf.io.read_file(mask_path)
 
-        images = tf.image.decode_jpeg(image_content, channels=self.channels[0])
-        masks = tf.image.decode_jpeg(mask_content, channels=self.channels[1])
+        image = tf.image.decode_jpeg(image_content, channels=self.channels[0])
+        mask = tf.image.decode_jpeg(mask_content, channels=self.channels[1])
 
-        return images, masks
+        return image, mask
 
     def _one_hot_encode(self, image, mask):
         """
@@ -200,6 +205,8 @@ class DataLoader(object):
                 image_f, mask_f = self._one_hot_encode(image_f, mask_f)
 
             image_f, mask_f = self._resize_data(image_f, mask_f)
+            image_f, mask_f = self._normalize(image_f, mask_f)
+
             return image_f, mask_f
         return tf.py_function(_augmentation_func, [image, mask], [tf.float32, tf.uint8])
 
