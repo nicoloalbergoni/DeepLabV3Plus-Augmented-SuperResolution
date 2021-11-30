@@ -74,7 +74,6 @@ def Jaccard(y_true, y_pred):
     nb_classes = K.int_shape(y_pred)[-1]
     iou = []
     pred_pixels = K.argmax(y_pred, axis=-1)
-    print(pred_pixels.numpy().shape)
     for i in range(0, nb_classes):  # exclude first label (background) and last label (void)
         true_labels = K.equal(y_true[:, :, 0], i)
         pred_labels = K.equal(pred_pixels, i)
