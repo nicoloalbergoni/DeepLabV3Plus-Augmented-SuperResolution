@@ -47,12 +47,18 @@ class DeeplabV3Plus():
         self.input_tensor = input_tensor
 
     def build_model(self, only_DCNN_output=False):
-        x, skip = self.EntryFlowBlock(self.img_input)
-        x = self.MiddleFlowBlocks(x, block_number=16)
-        x = self.ExitFlowBlock(x)
-        x = self.AtrousSpatialPyramidPooling(x)
+        entry_flow_output, skip = self.EntryFlowBlock(self.img_input)
+        middle_flow_output = self.MiddleFlowBlocks(
+            entry_flow_output, block_number=16)
+        exit_flow_output = self.ExitFlowBlock(middle_flow_output)
+        ASPP_output = self.AtrousSpatialPyramidPooling(exit_flow_output)
 
-        x = self.Decoder(x, skip)
+        if only_DCNN_output:
+            final_output = self.Decoder_only_DCNN(exit_flow_output)
+            model_name = "DeeplabV3Plus-Only_DCNN_Output"
+        else:
+            final_output = self.Decoder(ASPP_output, skip)
+            model_name = "DeeplabV3Plus"
 
         # Ensure that the model takes into account
         # any potential predecessors of `input_tensor`.
@@ -62,13 +68,13 @@ class DeeplabV3Plus():
             inputs = self.img_input
 
         if self.reshape_outputs:
-            x = Reshape(
-                (self.input_shape[0] * self.input_shape[1], self.classes))(x)
+            final_output = Reshape(
+                (self.input_shape[0] * self.input_shape[1], self.classes))(final_output)
 
         if self.last_activation in {'softmax', 'sigmoid'}:
-            x = Activation(self.last_activation)(x)
+            final_output = Activation(self.last_activation)(final_output)
 
-        model = Model(inputs, x, name='deeplabv3plus')
+        model = Model(inputs, final_output, name=model_name)
 
         if self.load_weights:
             if not os.path.exists("model"):
@@ -80,7 +86,7 @@ class DeeplabV3Plus():
                                     cache_subdir=""
                                     )
 
-            model.load_weights(weights_path, by_name=True)
+            model.load_weights(weights_path, by_name=True, skip_mismatch=True)
 
         return model
 
@@ -189,6 +195,36 @@ class DeeplabV3Plus():
 
         x = Conv2D(self.classes, (1, 1), padding='same',
                    name=last_layer_name)(x)
+        x = tf.keras.layers.Resizing(
+            *self.input_shape[0:2], interpolation="bilinear")(x)
+
+        return x
+
+    def Decoder_only_DCNN(self, inputs):
+
+        # Reduce depth dimensionality of low level features
+        x = Conv2D(48, (1, 1), padding="same",
+                   use_bias=False, name='feature_projection0')(inputs)
+        x = BatchNormalization(
+            name='feature_projection0_BN', epsilon=1e-5)(x)
+        x = ReLU()(x)
+
+        # Refine output
+        x = self._SepConv_BN(x, 256, 'decoder_conv0',
+                             depth_activation=True, epsilon=1e-5)
+        x = self._SepConv_BN(x, 256, 'decoder_conv1',
+                             depth_activation=True, epsilon=1e-5)
+
+        # Final Convolution for class prediction and upsampling
+        if self.classes == 21 and self.weights == 'pascal_voc':
+            last_layer_name = 'logits_semantic'
+        else:
+            last_layer_name = 'custom_logits_semantic'
+
+        x = Conv2D(self.classes, (1, 1), padding='same',
+                   name=last_layer_name)(x)
+
+        # Bilinear upsample to input shape
         x = tf.keras.layers.Resizing(
             *self.input_shape[0:2], interpolation="bilinear")(x)
 
