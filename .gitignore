@@ -286,3 +286,4 @@ pip-selfcheck.json
 model/
 .idea
 data/
+logs/

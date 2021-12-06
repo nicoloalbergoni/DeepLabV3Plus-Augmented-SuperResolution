@@ -1,5 +1,3 @@
-import cv2
-import random
 import numpy as np
 from PIL import Image
 from matplotlib import pyplot as plt
@@ -59,7 +57,7 @@ def sparse_crossentropy_ignoring_last_label(y_true, y_pred):
     y_true = K.one_hot(
         tf.cast(y_true[:, :, 0], tf.int32), nb_classes + 1)[:, :, :-1]
 
-    return K.categorical_crossentropy(y_true, y_pred, from_logits=False)
+    return K.categorical_crossentropy(y_true, y_pred, from_logits=True)
 
 
 def sparse_accuracy_ignoring_last_label(y_true, y_pred):
@@ -74,15 +72,19 @@ def Jaccard(y_true, y_pred):
     nb_classes = K.int_shape(y_pred)[-1]
     iou = []
     pred_pixels = K.argmax(y_pred, axis=-1)
+    # tf.print("Y_true", y_true.shape, y_true.dtype)
+    # tf.print("Y_pred", y_pred.shape, y_pred.dtype)
     for i in range(0, nb_classes):  # exclude first label (background) and last label (void)
         true_labels = K.equal(y_true[:, :, 0], i)
         pred_labels = K.equal(pred_pixels, i)
         inter = tf.cast(true_labels & pred_labels, tf.int32)
         union = tf.cast(true_labels | pred_labels, tf.int32)
         legal_batches = K.sum(tf.cast(true_labels, tf.int32), axis=1) > 0
-        ious = K.sum(inter, axis=1)/K.sum(union, axis=1)
-        iou.append(K.mean(tf.gather(ious, indices=tf.where(legal_batches))))
-        # iou.append(K.mean(ious[legal_batches]))
+        #tf.print("legal_batches", legal_batches.shape)
+        ious = K.sum(inter, axis=1) / K.sum(union, axis=1)
+        #tf.print("ious", ious.shape)
+        #iou.append(K.mean(tf.gather(ious, indices=tf.where(legal_batches))))
+        iou.append(K.mean(ious[legal_batches]))
 
     iou = tf.stack(iou)
     legal_labels = ~tf.math.is_nan(iou)
@@ -90,16 +92,27 @@ def Jaccard(y_true, y_pred):
     return K.mean(iou)
 
 
-def _random_crop(image, label, crop_shape):
-    if (image.shape[0] != label.shape[0]) or (image.shape[1] != label.shape[1]):
-        raise Exception('Image and label must have the same dimensions!')
+def sparse_Mean_IOU(y_true, y_pred):
+    nb_classes = (y_pred.shape.as_list())[-1]
+    iou = []
+    pred_pixels = tf.argmax(y_pred, axis=-1)
+    for i in range(0, nb_classes):  # exclude first label (background) and last label (void)
+        y_true_squeeze = y_true[:, :, 0]
+        # tf.print(y_true_squeeze.shape)
+        true_labels = tf.equal(y_true_squeeze, i)
+        pred_labels = tf.equal(pred_pixels, i)
+        inter = tf.cast(true_labels & pred_labels, tf.int32)
+        union = tf.cast(true_labels | pred_labels, tf.int32)
+        legal_batches = tf.reduce_sum(
+            tf.cast(true_labels, tf.int32), axis=1) > 0  # check if the current class is present in the image
 
-    if (crop_shape[0] < image.shape[1]) and (crop_shape[1] < image.shape[0]):
-        x = random.randrange(image.shape[1]-crop_shape[0])
-        y = random.randrange(image.shape[0]-crop_shape[1])
+        ious = tf.reduce_sum(inter, axis=1) / tf.reduce_sum(union, axis=1)
+        # returns average IoU of the same objects
+        #tf.print(legal_batches, ious)
+        iou.append(tf.reduce_mean(
+            tf.gather(ious, indices=tf.where(legal_batches))))
 
-        return image[y:y+crop_shape[1], x:x+crop_shape[0], :], label[y:y+crop_shape[1], x:x+crop_shape[0]]
-    else:
-        image = cv2.resize(image, crop_shape)
-        label = cv2.resize(label, crop_shape, interpolation=cv2.INTER_NEAREST)
-        return image, label
+    iou = tf.stack(iou)
+    legal_labels = ~tf.math.is_nan(iou)
+    iou = tf.gather(iou, indices=tf.where(legal_labels))
+    return tf.reduce_mean(iou)
