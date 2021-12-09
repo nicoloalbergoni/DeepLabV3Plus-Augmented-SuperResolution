@@ -46,7 +46,12 @@ class DeeplabV3Plus():
 
         self.input_tensor = input_tensor
 
-    def build_model(self, only_DCNN_output=False):
+    def build_model(self, only_DCNN_output=False, only_ASPP_output=False, first_upsample_size=(128, 128)):
+
+        if only_DCNN_output is True and only_ASPP_output is True:
+            raise ValueError("Both only_DCNN_output and only_ASPP_output cannot be True at \
+                            the same time")
+
         entry_flow_output, skip = self.EntryFlowBlock(self.img_input)
         middle_flow_output = self.MiddleFlowBlocks(
             entry_flow_output, block_number=16)
@@ -54,8 +59,13 @@ class DeeplabV3Plus():
         ASPP_output = self.AtrousSpatialPyramidPooling(exit_flow_output)
 
         if only_DCNN_output:
-            final_output = self.Decoder_only_DCNN(exit_flow_output)
+            final_output = self.Decoder_only_DCNN(
+                exit_flow_output, first_upsample_size)
             model_name = "DeeplabV3Plus-Only_DCNN_Output"
+        elif only_ASPP_output:
+            final_output = self.Decoder_only_ASPP(
+                ASPP_output, first_upsample_size)
+            model_name = "DeeplabV3Plus-Only_ASPP_Output"
         else:
             final_output = self.Decoder(ASPP_output, skip)
             model_name = "DeeplabV3Plus"
@@ -172,22 +182,25 @@ class DeeplabV3Plus():
         # which for OS 16 is 32x32
         skip_size = tf.keras.backend.int_shape(skip)
 
+        # Upsample ASPP output
         x = tf.keras.layers.Resizing(
             *skip_size[1:3], interpolation="bilinear")(inputs)
 
+        # Reduce low-level features depth dimensionality
         decoder_skip = Conv2D(48, (1, 1), padding="same",
                               use_bias=False, name='feature_projection0')(skip)
         decoder_skip = BatchNormalization(
             name='feature_projection0_BN', epsilon=1e-5)(decoder_skip)
         decoder_skip = ReLU()(decoder_skip)
 
+        # Concatenate low-level features with ASPP ouput
         x = Concatenate()([x, decoder_skip])
         x = self._SepConv_BN(x, 256, 'decoder_conv0',
                              depth_activation=True, epsilon=1e-5)
         x = self._SepConv_BN(x, 256, 'decoder_conv1',
                              depth_activation=True, epsilon=1e-5)
 
-        # Final Convolution for class prediction and upsampling
+        # Final Convolution for class prediction
         if self.classes == 21 and self.weights == 'pascal_voc':
             last_layer_name = 'logits_semantic'
         else:
@@ -195,12 +208,14 @@ class DeeplabV3Plus():
 
         x = Conv2D(self.classes, (1, 1), padding='same',
                    name=last_layer_name)(x)
+
+        # Bilinear upsample to input shape
         x = tf.keras.layers.Resizing(
             *self.input_shape[0:2], interpolation="bilinear")(x)
 
         return x
 
-    def Decoder_only_DCNN(self, inputs):
+    def Decoder_only_DCNN(self, inputs, first_upsample_size):
 
         # Reduce depth dimensionality of low level features
         x = Conv2D(48, (1, 1), padding="same",
@@ -209,13 +224,44 @@ class DeeplabV3Plus():
             name='feature_projection0_BN', epsilon=1e-5)(x)
         x = ReLU()(x)
 
+        # First bilinear upsample
+        x = tf.keras.layers.Resizing(
+            *first_upsample_size, interpolation="bilinear")(x)
+
         # Refine output
         x = self._SepConv_BN(x, 256, 'decoder_conv0',
                              depth_activation=True, epsilon=1e-5)
         x = self._SepConv_BN(x, 256, 'decoder_conv1',
                              depth_activation=True, epsilon=1e-5)
 
-        # Final Convolution for class prediction and upsampling
+        # Final Convolution for class prediction
+        if self.classes == 21 and self.weights == 'pascal_voc':
+            last_layer_name = 'logits_semantic'
+        else:
+            last_layer_name = 'custom_logits_semantic'
+
+        x = Conv2D(self.classes, (1, 1), padding='same',
+                   name=last_layer_name)(x)
+
+        # Bilinear upsample to input shape
+        x = tf.keras.layers.Resizing(
+            *self.input_shape[0:2], interpolation="bilinear")(x)
+
+        return x
+
+    def Decoder_only_ASPP(self, inputs, first_upsample_size):
+
+        # Upsample ASPP output
+        x = tf.keras.layers.Resizing(
+            *first_upsample_size, interpolation="bilinear")(inputs)
+
+        # Refine output
+        x = self._SepConv_BN(x, 256, 'decoder_conv0',
+                             depth_activation=True, epsilon=1e-5)
+        x = self._SepConv_BN(x, 256, 'decoder_conv1',
+                             depth_activation=True, epsilon=1e-5)
+
+        # Final Convolution for class prediction
         if self.classes == 21 and self.weights == 'pascal_voc':
             last_layer_name = 'logits_semantic'
         else:

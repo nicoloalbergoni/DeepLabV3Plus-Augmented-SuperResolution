@@ -1,8 +1,4 @@
-import numpy as np
 import tensorflow as tf
-from PIL import Image
-from utils import preprocess_image, plot_prediction
-from matplotlib import pyplot as plt
 from model import DeeplabV3Plus
 
 
@@ -14,7 +10,7 @@ def main(plot_model=False):
         OS=16,
         last_activation=None,
         load_weights=True,
-        reshape_outputs=False).build_model(only_DCNN_output=True)
+        reshape_outputs=False).build_model(only_DCNN_output=False, only_ASPP_output=True)
 
     if plot_model:
         tf.keras.utils.plot_model(

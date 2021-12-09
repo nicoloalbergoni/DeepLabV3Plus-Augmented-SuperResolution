@@ -5,18 +5,14 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Test",
+      "name": "Download PASCAL VOC",
       "type": "python",
       "request": "launch",
-      "program": "${cwd}/test.py",
-      "console": "integratedTerminal"
-    },
-    {
-      "name": "Train",
-      "type": "python",
-      "request": "launch",
-      "program": "${cwd}/train.py",
-      "console": "integratedTerminal"
+      "program": "download_and_prepare_voc.py",
+      "console": "integratedTerminal",
+      "args": [
+        "--remove_cmap"
+      ]
     }
   ]
 }
