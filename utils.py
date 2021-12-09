@@ -39,7 +39,7 @@ def sparse_crossentropy_ignoring_last_label(y_true, y_pred):
 def sparse_accuracy_ignoring_last_label(y_true, y_pred):
     nb_classes = (y_pred.shape.as_list())[-1]
     y_pred = tf.reshape(y_pred, (-1, nb_classes))
-    y_true = tf.cast(tf.reshape(y_true, -1), tf.int64)
+    y_true = tf.cast(tf.reshape(y_true, [-1]), tf.int64)
     # All labels not equal to the ignored one
     legal_labels = ~tf.equal(y_true, 255)
     right_labels = tf.reduce_sum(tf.cast(legal_labels & tf.equal(y_true, tf.argmax(

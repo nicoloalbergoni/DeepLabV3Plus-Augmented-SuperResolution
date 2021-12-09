@@ -228,15 +228,12 @@ class DataLoader(object):
         # Create dataset out of the 2 files:
         data = tf.data.Dataset.from_tensor_slices(self.image_paths)
 
+        if shuffle:
+            data = data.shuffle(len(self.image_paths))
+
         # Parse images and labels
         data = data.map(self._map_function, num_parallel_calls=AUTOTUNE)
 
-        if shuffle:
-            # Prefetch, shuffle then batch
-            data = data.prefetch(AUTOTUNE).shuffle(
-                random.randint(0, len(self.image_paths))).batch(batch_size)
-        else:
-            # Batch and prefetch
-            data = data.batch(batch_size).prefetch(AUTOTUNE)
+        data = data.batch(batch_size).prefetch(2)
 
         return data
