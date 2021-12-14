@@ -10,7 +10,7 @@ WEIGHTS_PATH_XCEPTION = "https://github.com/bonlime/keras-deeplab-v3-plus/releas
 WEIGHTS_PATH_MOBILE = "https://github.com/bonlime/keras-deeplab-v3-plus/releases/download/1.1/deeplabv3_mobilenetv2_tf_dim_ordering_tf_kernels.h5"
 
 
-class DeeplabV3Plus():
+class DeeplabV3Plus:
     def __init__(self, weights='pascal_voc', input_tensor=None, input_shape=(512, 512, 3), classes=21, OS=16,
                  last_activation=None, load_weights=True, reshape_outputs=False, backbone="xception", alpha=1.):
 
@@ -59,23 +59,33 @@ class DeeplabV3Plus():
             raise ValueError("Both only_DCNN_output and only_ASPP_output cannot be True at \
                             the same time")
 
-        entry_flow_output, skip = self.EntryFlowBlock(self.img_input)
-        middle_flow_output = self.MiddleFlowBlocks(
-            entry_flow_output, block_number=16)
-        exit_flow_output = self.ExitFlowBlock(middle_flow_output)
-        ASPP_output = self.AtrousSpatialPyramidPooling(exit_flow_output)
+        if self.backbone == "xception":
+            entry_flow_output, skip = self.EntryFlowBlock(self.img_input)
+            middle_flow_output = self.MiddleFlowBlocks(
+                entry_flow_output, block_number=16)
+            encoder_output = self.ExitFlowBlock(middle_flow_output)
+
+        else:
+            #TODO: Handle skip definition in case of mobilenet backbone
+            skip = None
+            entry_block_output = self.EntryBlockMobile(self.img_input)
+            encoder_output = self.MobileNet_Backbone_Encoder(entry_block_output)
+
+        ASPP_output = self.AtrousSpatialPyramidPooling(encoder_output)
+
+        model_name_prefix = f"DLV3Plus-{self.backbone}"
 
         if only_DCNN_output:
             final_output = self.Decoder_only_DCNN(
-                exit_flow_output, first_upsample_size)
-            model_name = "DeeplabV3Plus-Only_DCNN_Output"
+                encoder_output, first_upsample_size)
+            model_name = model_name_prefix + "-Only_DCNN_Output"
         elif only_ASPP_output:
             final_output = self.Decoder_only_ASPP(
                 ASPP_output, first_upsample_size)
-            model_name = "DeeplabV3Plus-Only_ASPP_Output"
+            model_name = model_name_prefix + "-Only_ASPP_Output"
         else:
             final_output = self.Decoder(ASPP_output, skip)
-            model_name = "DeeplabV3Plus"
+            model_name = model_name_prefix
 
         # Ensure that the model takes into account
         # any potential predecessors of `input_tensor`.
@@ -97,11 +107,17 @@ class DeeplabV3Plus():
             if not os.path.exists("model"):
                 os.mkdir("model")
 
-            weights_path = get_file('deeplabv3_xception_tf_dim_ordering_tf_kernels.h5',
-                                    WEIGHTS_PATH_XCEPTION,
-                                    cache_dir="model",
-                                    cache_subdir=""
-                                    )
+            if self.backbone == "xception":
+                weights_path = get_file('deeplabv3_xception_tf_dim_ordering_tf_kernels.h5',
+                                        WEIGHTS_PATH_XCEPTION,
+                                        cache_dir="model",
+                                        cache_subdir="")
+
+            else:
+                weights_path = get_file('deeplabv3_mobilenetv2_tf_dim_ordering_tf_kernels.h5',
+                                        WEIGHTS_PATH_MOBILE,
+                                        cache_dir="model",
+                                        cache_subdir="")
 
             model.load_weights(weights_path, by_name=True, skip_mismatch=True)
 
@@ -118,32 +134,35 @@ class DeeplabV3Plus():
         x = BatchNormalization(name='entry_flow_conv1_2_BN')(x)
         x = ReLU()(x)
 
-        x = self._Xception_block(x, [128, 128, 128], "entry_flow_block1", skip_connection_type="conv",
-                                 last_stride=2, depth_activation=False, return_skip=False)
+        x = DeeplabV3Plus._Xception_block(x, [128, 128, 128], "entry_flow_block1", skip_connection_type="conv",
+                                          last_stride=2, depth_activation=False, return_skip=False)
 
-        x, skip = self._Xception_block(x, [256, 256, 256], "entry_flow_block2", skip_connection_type="conv",
-                                       last_stride=2, depth_activation=False, return_skip=True)
+        x, skip = DeeplabV3Plus._Xception_block(x, [256, 256, 256], "entry_flow_block2", skip_connection_type="conv",
+                                                last_stride=2, depth_activation=False, return_skip=True)
 
-        x = self._Xception_block(x, [728, 728, 728], "entry_flow_block3", skip_connection_type="conv",
-                                 last_stride=self.entry_block3_stride, depth_activation=False, return_skip=False)
+        x = DeeplabV3Plus._Xception_block(x, [728, 728, 728], "entry_flow_block3", skip_connection_type="conv",
+                                          last_stride=self.entry_block3_stride, depth_activation=False,
+                                          return_skip=False)
 
         return x, skip
 
     def MiddleFlowBlocks(self, x, block_number=16):
         for i in range(block_number):
-            x = self._Xception_block(x, [728, 728, 728], f"middle_flow_unit_{i + 1}", skip_connection_type="sum",
-                                     last_stride=1, rate=self.middle_block_rate, depth_activation=False,
-                                     return_skip=False)
+            x = DeeplabV3Plus._Xception_block(x, [728, 728, 728], f"middle_flow_unit_{i + 1}",
+                                              skip_connection_type="sum",
+                                              last_stride=1, rate=self.middle_block_rate, depth_activation=False,
+                                              return_skip=False)
 
         return x
 
     def ExitFlowBlock(self, inputs):
-        x = self._Xception_block(inputs, [728, 1024, 1024], "exit_flow_block1", skip_connection_type="conv",
-                                 last_stride=1, rate=self.exit_block_rates[0], depth_activation=False,
-                                 return_skip=False)
+        x = DeeplabV3Plus._Xception_block(inputs, [728, 1024, 1024], "exit_flow_block1", skip_connection_type="conv",
+                                          last_stride=1, rate=self.exit_block_rates[0], depth_activation=False,
+                                          return_skip=False)
 
-        x = self._Xception_block(x, [1536, 1536, 2048], "exit_flow_block2", skip_connection_type=None,
-                                 last_stride=1, rate=self.exit_block_rates[1], depth_activation=True, return_skip=False)
+        x = DeeplabV3Plus._Xception_block(x, [1536, 1536, 2048], "exit_flow_block2", skip_connection_type=None,
+                                          last_stride=1, rate=self.exit_block_rates[1], depth_activation=True,
+                                          return_skip=False)
 
         return x
 
@@ -167,17 +186,21 @@ class DeeplabV3Plus():
         b0 = BatchNormalization(name='aspp0_BN', epsilon=1e-5)(b0)
         b0 = ReLU()(b0)
 
-        # 3x3 Conv, Rate 6/12
-        b1 = DeeplabV3Plus._SepConv_BN(inputs, 256, "aspp1", stride=1, kernel_size=3,
-                                       rate=self.atrous_rates[0], depth_activation=True)
-        # 3x3 Conv, Rate 12/24
-        b2 = DeeplabV3Plus._SepConv_BN(inputs, 256, "aspp2", stride=1, kernel_size=3,
-                                       rate=self.atrous_rates[1], depth_activation=True)
-        # 3x3 Conv, Rate 18/36
-        b3 = DeeplabV3Plus._SepConv_BN(inputs, 256, "aspp3", stride=1, kernel_size=3,
-                                       rate=self.atrous_rates[2], depth_activation=True)
+        if self.backbone == "xception":
+            # 3x3 Conv, Rate 6/12
+            b1 = DeeplabV3Plus._SepConv_BN(inputs, 256, "aspp1", stride=1, kernel_size=3,
+                                           rate=self.atrous_rates[0], depth_activation=True)
+            # 3x3 Conv, Rate 12/24
+            b2 = DeeplabV3Plus._SepConv_BN(inputs, 256, "aspp2", stride=1, kernel_size=3,
+                                           rate=self.atrous_rates[1], depth_activation=True)
+            # 3x3 Conv, Rate 18/36
+            b3 = DeeplabV3Plus._SepConv_BN(inputs, 256, "aspp3", stride=1, kernel_size=3,
+                                           rate=self.atrous_rates[2], depth_activation=True)
 
-        output = Concatenate()([image_pooling, b0, b1, b2, b3])
+            output = Concatenate()([image_pooling, b0, b1, b2, b3])
+        else:
+            output = Concatenate()([image_pooling, b0])
+
         output = Conv2D(256, (1, 1), padding='same', use_bias=False,
                         name="concat_projection")(output)
         output = BatchNormalization(
@@ -186,28 +209,29 @@ class DeeplabV3Plus():
 
         return output
 
-    def Decoder(self, inputs, skip):
-        # For input size of 512x512 skip_size is 128x128 as it corresponds to a x4 upsample of the encoder output feature
-        # which for OS 16 is 32x32
-        skip_size = tf.keras.backend.int_shape(skip)
+    def Decoder(self, x, skip):
 
-        # Upsample ASPP output
-        x = tf.keras.layers.Resizing(
-            *skip_size[1:3], interpolation="bilinear")(inputs)
+        if self.backbone == "xception":
+            # For input size of 512x512 skip_size is 128x128 as it corresponds to a x4 upsample of the encoder output feature
+            # which for OS 16 is 32x32
+            skip_size = tf.keras.backend.int_shape(skip)
+            # Upsample ASPP output
+            x = tf.keras.layers.Resizing(
+                *skip_size[1:3], interpolation="bilinear")(x)
 
-        # Reduce low-level features depth dimensionality
-        decoder_skip = Conv2D(48, (1, 1), padding="same",
-                              use_bias=False, name='feature_projection0')(skip)
-        decoder_skip = BatchNormalization(
-            name='feature_projection0_BN', epsilon=1e-5)(decoder_skip)
-        decoder_skip = ReLU()(decoder_skip)
+            # Reduce low-level features depth dimensionality
+            decoder_skip = Conv2D(48, (1, 1), padding="same",
+                                  use_bias=False, name='feature_projection0')(skip)
+            decoder_skip = BatchNormalization(
+                name='feature_projection0_BN', epsilon=1e-5)(decoder_skip)
+            decoder_skip = ReLU()(decoder_skip)
 
-        # Concatenate low-level features with ASPP ouput
-        x = Concatenate()([x, decoder_skip])
-        x = DeeplabV3Plus._SepConv_BN(x, 256, 'decoder_conv0',
-                                      depth_activation=True, epsilon=1e-5)
-        x = DeeplabV3Plus._SepConv_BN(x, 256, 'decoder_conv1',
-                                      depth_activation=True, epsilon=1e-5)
+            # Concatenate low-level features with ASPP ouput
+            x = Concatenate()([x, decoder_skip])
+            x = DeeplabV3Plus._SepConv_BN(x, 256, 'decoder_conv0',
+                                          depth_activation=True, epsilon=1e-5)
+            x = DeeplabV3Plus._SepConv_BN(x, 256, 'decoder_conv1',
+                                          depth_activation=True, epsilon=1e-5)
 
         # Final Convolution for class prediction
         if self.classes == 21 and self.weights == 'pascal_voc':
@@ -285,10 +309,79 @@ class DeeplabV3Plus():
 
         return x
 
-    def EntryBlockMobile(self):
-        pass
+    def EntryBlockMobile(self, inputs):
+        first_block_filters = DeeplabV3Plus._make_divisible(32 * self.alpha, 8)
+        pointwise_conv_filters = int(16 * self.alpha)
+        pointwise_filters = DeeplabV3Plus._make_divisible(pointwise_conv_filters, 8)
+        prefix = "expanded_conv_"
 
-    def _Xception_block(self, inputs, filter_list, prefix, skip_connection_type, last_stride,
+        # First concolution
+        x = Conv2D(first_block_filters,
+                   kernel_size=3,
+                   strides=(2, 2), padding='same', use_bias=False,
+                   name='Conv' if self.input_shape[2] == 3 else 'Conv_')(inputs)
+        x = BatchNormalization(
+            epsilon=1e-3, momentum=0.999, name='Conv_BN')(x)
+        x = Activation(tf.nn.relu6, name='Conv_Relu6')(x)
+
+        # Depthwise
+        x = DepthwiseConv2D(kernel_size=3, strides=1, activation=None,
+                            use_bias=False, padding='same', name=prefix + 'depthwise')(x)
+        x = BatchNormalization(epsilon=1e-3, momentum=0.999,
+                               name=prefix + 'depthwise_BN')(x)
+        x = Activation(tf.nn.relu6, name=prefix + 'depthwise_relu')(x)
+
+        # Project
+        x = Conv2D(pointwise_filters,
+                   kernel_size=1, padding='same', use_bias=False, activation=None,
+                   name=prefix + 'project')(x)
+        x = BatchNormalization(epsilon=1e-3, momentum=0.999, name=prefix + 'project_BN')(x)
+        return x
+
+    def MobileNet_Backbone_Encoder(self, inputs):
+        x = DeeplabV3Plus._inverted_res_block(inputs, filters=24, alpha=self.alpha, stride=2,
+                                              expansion_factor=6, block_id=1, skip_connection=False)
+        x = DeeplabV3Plus._inverted_res_block(x, filters=24, alpha=self.alpha, stride=1,
+                                              expansion_factor=6, block_id=2, skip_connection=True)
+
+        x = DeeplabV3Plus._inverted_res_block(x, filters=32, alpha=self.alpha, stride=2,
+                                              expansion_factor=6, block_id=3, skip_connection=False)
+        x = DeeplabV3Plus._inverted_res_block(x, filters=32, alpha=self.alpha, stride=1,
+                                              expansion_factor=6, block_id=4, skip_connection=True)
+        x = DeeplabV3Plus._inverted_res_block(x, filters=32, alpha=self.alpha, stride=1,
+                                              expansion_factor=6, block_id=5, skip_connection=True)
+
+        # stride in block 6 changed from 2 -> 1, so we need to use rate = 2
+        x = DeeplabV3Plus._inverted_res_block(x, filters=64, alpha=self.alpha, stride=1,  # 1!
+                                              expansion_factor=6, block_id=6, skip_connection=False)
+        x = DeeplabV3Plus._inverted_res_block(x, filters=64, alpha=self.alpha, stride=1, rate=2,
+                                              expansion_factor=6, block_id=7, skip_connection=True)
+        x = DeeplabV3Plus._inverted_res_block(x, filters=64, alpha=self.alpha, stride=1, rate=2,
+                                              expansion_factor=6, block_id=8, skip_connection=True)
+        x = DeeplabV3Plus._inverted_res_block(x, filters=64, alpha=self.alpha, stride=1, rate=2,
+                                              expansion_factor=6, block_id=9, skip_connection=True)
+
+        x = DeeplabV3Plus._inverted_res_block(x, filters=96, alpha=self.alpha, stride=1, rate=2,
+                                              expansion_factor=6, block_id=10, skip_connection=False)
+        x = DeeplabV3Plus._inverted_res_block(x, filters=96, alpha=self.alpha, stride=1, rate=2,
+                                              expansion_factor=6, block_id=11, skip_connection=True)
+        x = DeeplabV3Plus._inverted_res_block(x, filters=96, alpha=self.alpha, stride=1, rate=2,
+                                              expansion_factor=6, block_id=12, skip_connection=True)
+
+        x = DeeplabV3Plus._inverted_res_block(x, filters=160, alpha=self.alpha, stride=1, rate=2,  # 1!
+                                              expansion_factor=6, block_id=13, skip_connection=False)
+        x = DeeplabV3Plus._inverted_res_block(x, filters=160, alpha=self.alpha, stride=1, rate=4,
+                                              expansion_factor=6, block_id=14, skip_connection=True)
+        x = DeeplabV3Plus._inverted_res_block(x, filters=160, alpha=self.alpha, stride=1, rate=4,
+                                              expansion_factor=6, block_id=15, skip_connection=True)
+
+        x = DeeplabV3Plus._inverted_res_block(x, filters=320, alpha=self.alpha, stride=1, rate=4,
+                                              expansion_factor=6, block_id=16, skip_connection=False)
+
+        return x
+
+    @staticmethod
+    def _Xception_block(inputs, filter_list, prefix, skip_connection_type, last_stride,
                         rate=1, depth_activation=False, return_skip=False):
         """ Basic building block of modified Xception network
             Args:
@@ -330,6 +423,42 @@ class DeeplabV3Plus():
             return outputs, skip
         else:
             return outputs
+
+    @staticmethod
+    def _inverted_res_block(inputs, expansion_factor, stride, alpha, filters, block_id, skip_connection, rate=1):
+        in_channels = inputs.shape[-1]
+        pointwise_conv_filters = int(filters * alpha)
+        pointwise_filters = DeeplabV3Plus._make_divisible(pointwise_conv_filters, 8)
+        prefix = f"expanded_conv_{block_id}_"
+
+        # Expand
+        x = Conv2D(expansion_factor * in_channels, kernel_size=1, padding='same',
+                   use_bias=False, activation=None,
+                   name=prefix + 'expand')(inputs)
+        x = BatchNormalization(epsilon=1e-3, momentum=0.999,
+                               name=prefix + 'expand_BN')(x)
+        x = Activation(tf.nn.relu6, name=prefix + 'expand_relu')(x)
+
+        # Depthwise
+        x = DepthwiseConv2D(kernel_size=3, strides=stride, activation=None,
+                            use_bias=False, padding='same', dilation_rate=(rate, rate),
+                            name=prefix + 'depthwise')(x)
+        x = BatchNormalization(epsilon=1e-3, momentum=0.999,
+                               name=prefix + 'depthwise_BN')(x)
+
+        x = Activation(tf.nn.relu6, name=prefix + 'depthwise_relu')(x)
+
+        # Project
+        x = Conv2D(pointwise_filters,
+                   kernel_size=1, padding='same', use_bias=False, activation=None,
+                   name=prefix + 'project')(x)
+        x = BatchNormalization(epsilon=1e-3, momentum=0.999,
+                               name=prefix + 'project_BN')(x)
+
+        if skip_connection:
+            return Add(name=prefix + 'add')([inputs, x])
+
+        return x
 
     @staticmethod
     def _SepConv_BN(x, filters, prefix, stride=1, kernel_size=3, rate=1, depth_activation=False, epsilon=1e-3):

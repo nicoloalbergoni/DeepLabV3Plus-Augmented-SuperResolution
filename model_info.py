@@ -10,7 +10,9 @@ def main(plot_model=False):
         OS=16,
         last_activation=None,
         load_weights=True,
-        reshape_outputs=False).build_model(only_DCNN_output=False, only_ASPP_output=True)
+        backbone="mobilenet",
+        alpha=1.,
+        reshape_outputs=False).build_model(only_DCNN_output=False, only_ASPP_output=False)
 
     if plot_model:
         tf.keras.utils.plot_model(
