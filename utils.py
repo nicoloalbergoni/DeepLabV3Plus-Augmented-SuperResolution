@@ -53,7 +53,7 @@ def sparse_Mean_IOU(y_true, y_pred):
     nb_classes = (y_pred.shape.as_list())[-1]
     iou = []
     pred_pixels = tf.argmax(y_pred, axis=-1)
-    for i in range(0, nb_classes):  # exclude first label (background) and last label (void)
+    for i in range(0, nb_classes):  # exclude last label (void)
         y_true_squeeze = y_true[:, :, 0]
         true_labels = tf.equal(y_true_squeeze, i)
         pred_labels = tf.equal(pred_pixels, i)

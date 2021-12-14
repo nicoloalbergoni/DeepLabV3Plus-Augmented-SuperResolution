@@ -2,15 +2,17 @@ import os
 import tensorflow as tf
 from tensorflow.keras import Model
 from tensorflow.keras.utils import get_file
-from tensorflow.keras.layers import Conv2D, BatchNormalization, ReLU, ZeroPadding2D, Input, DepthwiseConv2D, Add, GlobalAveragePooling2D, Concatenate, Activation, Reshape
+from tensorflow.keras.layers import Conv2D, BatchNormalization, ReLU, ZeroPadding2D, Input, DepthwiseConv2D, Add, \
+    GlobalAveragePooling2D, Concatenate, Activation, Reshape
 from tensorflow.keras.utils import get_source_inputs
 
-WEIGHTS_PATH_X = "https://github.com/bonlime/keras-deeplab-v3-plus/releases/download/1.1/deeplabv3_xception_tf_dim_ordering_tf_kernels.h5"
+WEIGHTS_PATH_XCEPTION = "https://github.com/bonlime/keras-deeplab-v3-plus/releases/download/1.1/deeplabv3_xception_tf_dim_ordering_tf_kernels.h5"
+WEIGHTS_PATH_MOBILE = "https://github.com/bonlime/keras-deeplab-v3-plus/releases/download/1.1/deeplabv3_mobilenetv2_tf_dim_ordering_tf_kernels.h5"
 
 
 class DeeplabV3Plus():
     def __init__(self, weights='pascal_voc', input_tensor=None, input_shape=(512, 512, 3), classes=21, OS=16,
-                 last_activation=None, load_weights=True, reshape_outputs=False):
+                 last_activation=None, load_weights=True, reshape_outputs=False, backbone="xception", alpha=1.):
 
         if not (weights in {'pascal_voc', None}):
             raise ValueError('The `weights` argument should be either '
@@ -21,12 +23,17 @@ class DeeplabV3Plus():
             raise ValueError(
                 "The last_activation parameter must be either None, softmax or sigmoid")
 
+        if not (backbone in {"xception", "mobilenet"}):
+            raise ValueError("Backbone must be either xception or mobilenet")
+
         self.weights = weights
         self.input_shape = input_shape
         self.classes = classes
         self.last_activation = last_activation
         self.load_weights = load_weights
         self.reshape_outputs = reshape_outputs
+        self.backbone = backbone
+        self.alpha = alpha
 
         if OS == 8:
             self.entry_block3_stride = 1
@@ -91,7 +98,7 @@ class DeeplabV3Plus():
                 os.mkdir("model")
 
             weights_path = get_file('deeplabv3_xception_tf_dim_ordering_tf_kernels.h5',
-                                    WEIGHTS_PATH_X,
+                                    WEIGHTS_PATH_XCEPTION,
                                     cache_dir="model",
                                     cache_subdir=""
                                     )
@@ -125,13 +132,15 @@ class DeeplabV3Plus():
     def MiddleFlowBlocks(self, x, block_number=16):
         for i in range(block_number):
             x = self._Xception_block(x, [728, 728, 728], f"middle_flow_unit_{i + 1}", skip_connection_type="sum",
-                                     last_stride=1, rate=self.middle_block_rate, depth_activation=False, return_skip=False)
+                                     last_stride=1, rate=self.middle_block_rate, depth_activation=False,
+                                     return_skip=False)
 
         return x
 
     def ExitFlowBlock(self, inputs):
         x = self._Xception_block(inputs, [728, 1024, 1024], "exit_flow_block1", skip_connection_type="conv",
-                                 last_stride=1, rate=self.exit_block_rates[0], depth_activation=False, return_skip=False)
+                                 last_stride=1, rate=self.exit_block_rates[0], depth_activation=False,
+                                 return_skip=False)
 
         x = self._Xception_block(x, [1536, 1536, 2048], "exit_flow_block2", skip_connection_type=None,
                                  last_stride=1, rate=self.exit_block_rates[1], depth_activation=True, return_skip=False)
@@ -159,14 +168,14 @@ class DeeplabV3Plus():
         b0 = ReLU()(b0)
 
         # 3x3 Conv, Rate 6/12
-        b1 = self._SepConv_BN(inputs, 256, "aspp1", stride=1, kernel_size=3,
-                              rate=self.atrous_rates[0], depth_activation=True)
+        b1 = DeeplabV3Plus._SepConv_BN(inputs, 256, "aspp1", stride=1, kernel_size=3,
+                                       rate=self.atrous_rates[0], depth_activation=True)
         # 3x3 Conv, Rate 12/24
-        b2 = self._SepConv_BN(inputs, 256, "aspp2", stride=1, kernel_size=3,
-                              rate=self.atrous_rates[1], depth_activation=True)
+        b2 = DeeplabV3Plus._SepConv_BN(inputs, 256, "aspp2", stride=1, kernel_size=3,
+                                       rate=self.atrous_rates[1], depth_activation=True)
         # 3x3 Conv, Rate 18/36
-        b3 = self._SepConv_BN(inputs, 256, "aspp3", stride=1, kernel_size=3,
-                              rate=self.atrous_rates[2], depth_activation=True)
+        b3 = DeeplabV3Plus._SepConv_BN(inputs, 256, "aspp3", stride=1, kernel_size=3,
+                                       rate=self.atrous_rates[2], depth_activation=True)
 
         output = Concatenate()([image_pooling, b0, b1, b2, b3])
         output = Conv2D(256, (1, 1), padding='same', use_bias=False,
@@ -195,10 +204,10 @@ class DeeplabV3Plus():
 
         # Concatenate low-level features with ASPP ouput
         x = Concatenate()([x, decoder_skip])
-        x = self._SepConv_BN(x, 256, 'decoder_conv0',
-                             depth_activation=True, epsilon=1e-5)
-        x = self._SepConv_BN(x, 256, 'decoder_conv1',
-                             depth_activation=True, epsilon=1e-5)
+        x = DeeplabV3Plus._SepConv_BN(x, 256, 'decoder_conv0',
+                                      depth_activation=True, epsilon=1e-5)
+        x = DeeplabV3Plus._SepConv_BN(x, 256, 'decoder_conv1',
+                                      depth_activation=True, epsilon=1e-5)
 
         # Final Convolution for class prediction
         if self.classes == 21 and self.weights == 'pascal_voc':
@@ -229,10 +238,10 @@ class DeeplabV3Plus():
             *first_upsample_size, interpolation="bilinear")(x)
 
         # Refine output
-        x = self._SepConv_BN(x, 256, 'decoder_conv0',
-                             depth_activation=True, epsilon=1e-5)
-        x = self._SepConv_BN(x, 256, 'decoder_conv1',
-                             depth_activation=True, epsilon=1e-5)
+        x = DeeplabV3Plus._SepConv_BN(x, 256, 'decoder_conv0',
+                                      depth_activation=True, epsilon=1e-5)
+        x = DeeplabV3Plus._SepConv_BN(x, 256, 'decoder_conv1',
+                                      depth_activation=True, epsilon=1e-5)
 
         # Final Convolution for class prediction
         if self.classes == 21 and self.weights == 'pascal_voc':
@@ -256,10 +265,10 @@ class DeeplabV3Plus():
             *first_upsample_size, interpolation="bilinear")(inputs)
 
         # Refine output
-        x = self._SepConv_BN(x, 256, 'decoder_conv0',
-                             depth_activation=True, epsilon=1e-5)
-        x = self._SepConv_BN(x, 256, 'decoder_conv1',
-                             depth_activation=True, epsilon=1e-5)
+        x = DeeplabV3Plus._SepConv_BN(x, 256, 'decoder_conv0',
+                                      depth_activation=True, epsilon=1e-5)
+        x = DeeplabV3Plus._SepConv_BN(x, 256, 'decoder_conv1',
+                                      depth_activation=True, epsilon=1e-5)
 
         # Final Convolution for class prediction
         if self.classes == 21 and self.weights == 'pascal_voc':
@@ -276,6 +285,9 @@ class DeeplabV3Plus():
 
         return x
 
+    def EntryBlockMobile(self):
+        pass
+
     def _Xception_block(self, inputs, filter_list, prefix, skip_connection_type, last_stride,
                         rate=1, depth_activation=False, return_skip=False):
         """ Basic building block of modified Xception network
@@ -291,19 +303,19 @@ class DeeplabV3Plus():
         """
         residual = inputs
         for i in range(3):
-            residual = self._SepConv_BN(residual,
-                                        filter_list[i],
-                                        prefix + f'_separable_conv{i + 1}',
-                                        stride=last_stride if i == 2 else 1,
-                                        rate=rate,
-                                        depth_activation=depth_activation)
+            residual = DeeplabV3Plus._SepConv_BN(residual,
+                                                 filter_list[i],
+                                                 prefix + f'_separable_conv{i + 1}',
+                                                 stride=last_stride if i == 2 else 1,
+                                                 rate=rate,
+                                                 depth_activation=depth_activation)
             if i == 1:
                 skip = residual
 
         if skip_connection_type == 'conv':
-            shortcut = self._conv2d_same(inputs, filter_list[-1], prefix + '_shortcut',
-                                         kernel_size=1,
-                                         stride=last_stride)
+            shortcut = DeeplabV3Plus._conv2d_same(inputs, filter_list[-1], prefix + '_shortcut',
+                                                  kernel_size=1,
+                                                  stride=last_stride)
             shortcut = BatchNormalization(
                 name=prefix + '_shortcut_BN')(shortcut)
             outputs = Add()([residual, shortcut])
@@ -319,7 +331,8 @@ class DeeplabV3Plus():
         else:
             return outputs
 
-    def _SepConv_BN(self, x, filters, prefix, stride=1, kernel_size=3, rate=1, depth_activation=False, epsilon=1e-3):
+    @staticmethod
+    def _SepConv_BN(x, filters, prefix, stride=1, kernel_size=3, rate=1, depth_activation=False, epsilon=1e-3):
         """ SepConv with BN between depthwise & pointwise. Optionally add activation after BN
         Implements right "same" padding for even kernel sizes
         Args:
@@ -336,7 +349,7 @@ class DeeplabV3Plus():
             depth_padding = 'same'
         else:
             kernel_size_effective = kernel_size + \
-                (kernel_size - 1) * (rate - 1)
+                                    (kernel_size - 1) * (rate - 1)
             pad_total = kernel_size_effective - 1
             pad_beg = pad_total // 2
             pad_end = pad_total - pad_beg
@@ -346,7 +359,8 @@ class DeeplabV3Plus():
         if not depth_activation:
             x = ReLU()(x)
 
-        x = DepthwiseConv2D(kernel_size=(kernel_size, kernel_size), strides=(stride, stride), dilation_rate=(rate, rate),
+        x = DepthwiseConv2D(kernel_size=(kernel_size, kernel_size), strides=(stride, stride),
+                            dilation_rate=(rate, rate),
                             padding=depth_padding, use_bias=False, name=prefix + '_depthwise')(x)
         x = BatchNormalization(
             name=prefix + '_depthwise_BN', epsilon=epsilon)(x)
@@ -364,7 +378,8 @@ class DeeplabV3Plus():
 
         return x
 
-    def _conv2d_same(self, x, filters, prefix, stride=1, kernel_size=3, rate=1):
+    @staticmethod
+    def _conv2d_same(x, filters, prefix, stride=1, kernel_size=3, rate=1):
         """Implements right 'same' padding for even kernel sizes
             Without this there is a 1 pixel drift when stride = 2
             Args:
@@ -384,7 +399,7 @@ class DeeplabV3Plus():
                           name=prefix)(x)
         else:
             kernel_size_effective = kernel_size + \
-                (kernel_size - 1) * (rate - 1)
+                                    (kernel_size - 1) * (rate - 1)
             pad_total = kernel_size_effective - 1
             pad_beg = pad_total // 2
             pad_end = pad_total - pad_beg
@@ -395,3 +410,18 @@ class DeeplabV3Plus():
                           padding='valid', use_bias=False,
                           dilation_rate=(rate, rate),
                           name=prefix)(x)
+
+    @staticmethod
+    def _make_divisible(value, divisor, min_value=None):
+        """
+        Returns a value that is divisible bi divisor
+
+        Used to ensure that all layers have a number of channels divisible by divisor
+        """
+        if min_value is None:
+            min_value = divisor
+        new_v = max(min_value, int(value + divisor / 2) // divisor * divisor)
+        # Make sure that round down does not go down by more than 10%.
+        if new_v < 0.9 * value:
+            new_v += divisor
+        return new_v
