@@ -20,9 +20,8 @@ args = parser.parse_args()
 
 
 def main():
-
     BASE_DIR = os.getcwd()
-    #DATASET_URL = "https://data.deepai.org/PascalVOC2012.zip"
+    # DATASET_URL = "https://data.deepai.org/PascalVOC2012.zip"
 
     if args.use_mirror:
         DATASET_URL = "http://pjreddie.com/media/files/VOCtrainval_11-May-2012.tar"
@@ -30,7 +29,7 @@ def main():
         DATASET_URL = "http://host.robots.ox.ac.uk/pascal/VOC/voc2012/VOCtrainval_11-May-2012.tar"
 
     DATA_DIR = os.path.join(BASE_DIR, "data")
-    #PASCAL_ROOT = os.path.join(DATA_DIR, "VOCdevkit", "VOC2012")
+    # PASCAL_ROOT = os.path.join(DATA_DIR, "VOCdevkit", "VOC2012")
     PASCAL_ROOT = os.path.normpath(args.pascal_root)
 
     filepath = download_dataset(DATASET_URL, DATA_DIR)

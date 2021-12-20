@@ -34,17 +34,22 @@ class DeeplabV3Plus:
         self.reshape_outputs = reshape_outputs
         self.backbone = backbone
         self.alpha = alpha
+        self.OS = OS
 
-        if OS == 8:
-            self.entry_block3_stride = 1
-            self.middle_block_rate = 2  # ! Not mentioned in paper, but required
-            self.exit_block_rates = (2, 4)
-            self.atrous_rates = (12, 24, 36)
+        if self.backbone == "xception":
+            if OS == 8:
+                self.entry_block3_stride = 1
+                self.middle_block_rate = 2  # ! Not mentioned in paper, but required
+                self.exit_block_rates = (2, 4)
+                self.atrous_rates = (12, 24, 36)
+            else:
+                self.entry_block3_stride = 2
+                self.middle_block_rate = 1
+                self.exit_block_rates = (1, 2)
+                self.atrous_rates = (6, 12, 18)
         else:
-            self.entry_block3_stride = 2
-            self.middle_block_rate = 1
-            self.exit_block_rates = (1, 2)
-            self.atrous_rates = (6, 12, 18)
+            # OS is set to 8 for mobilenet backbone
+            self.OS = 8
 
         if input_tensor is None:
             self.img_input = Input(shape=input_shape)
@@ -55,9 +60,11 @@ class DeeplabV3Plus:
 
     def build_model(self, only_DCNN_output=False, only_ASPP_output=False, first_upsample_size=(128, 128)):
 
-        if only_DCNN_output is True and only_ASPP_output is True:
+        if self.backbone == "xception" and only_DCNN_output is True and only_ASPP_output is True:
             raise ValueError("Both only_DCNN_output and only_ASPP_output cannot be True at \
                             the same time")
+
+        model_name_prefix = f"DLV3Plus-{self.backbone}-OS{self.OS}"
 
         if self.backbone == "xception":
             entry_flow_output, skip = self.EntryFlowBlock(self.img_input)
@@ -65,27 +72,30 @@ class DeeplabV3Plus:
                 entry_flow_output, block_number=16)
             encoder_output = self.ExitFlowBlock(middle_flow_output)
 
+            ASPP_output = self.AtrousSpatialPyramidPooling(encoder_output)
+
+            # Currently modified Decoders are only implemented for xception backbone
+            if only_DCNN_output:
+                decoder_output = self.Decoder_only_DCNN(
+                    encoder_output, first_upsample_size)
+                model_name = model_name_prefix + "-Only_DCNN_Output"
+            elif only_ASPP_output:
+                decoder_output = self.Decoder_only_ASPP(
+                    ASPP_output, first_upsample_size)
+                model_name = model_name_prefix + "-Only_ASPP_Output"
+            else:
+                decoder_output = self.Decoder(ASPP_output, skip)
+                model_name = model_name_prefix
+
         else:
-            #TODO: Handle skip definition in case of mobilenet backbone
-            skip = None
             entry_block_output = self.EntryBlockMobile(self.img_input)
             encoder_output = self.MobileNet_Backbone_Encoder(entry_block_output)
-
-        ASPP_output = self.AtrousSpatialPyramidPooling(encoder_output)
-
-        model_name_prefix = f"DLV3Plus-{self.backbone}"
-
-        if only_DCNN_output:
-            final_output = self.Decoder_only_DCNN(
-                encoder_output, first_upsample_size)
-            model_name = model_name_prefix + "-Only_DCNN_Output"
-        elif only_ASPP_output:
-            final_output = self.Decoder_only_ASPP(
-                ASPP_output, first_upsample_size)
-            model_name = model_name_prefix + "-Only_ASPP_Output"
-        else:
-            final_output = self.Decoder(ASPP_output, skip)
+            # There is no call to Decoder function for mobilenet backbone as in the implementation the
+            # ASPP output is directly upsampled to the input image size
+            decoder_output = self.AtrousSpatialPyramidPooling(encoder_output)
             model_name = model_name_prefix
+
+        final_output = self.Final_Class_Prediction(decoder_output)
 
         # Ensure that the model takes into account
         # any potential predecessors of `input_tensor`.
@@ -233,19 +243,6 @@ class DeeplabV3Plus:
             x = DeeplabV3Plus._SepConv_BN(x, 256, 'decoder_conv1',
                                           depth_activation=True, epsilon=1e-5)
 
-        # Final Convolution for class prediction
-        if self.classes == 21 and self.weights == 'pascal_voc':
-            last_layer_name = 'logits_semantic'
-        else:
-            last_layer_name = 'custom_logits_semantic'
-
-        x = Conv2D(self.classes, (1, 1), padding='same',
-                   name=last_layer_name)(x)
-
-        # Bilinear upsample to input shape
-        x = tf.keras.layers.Resizing(
-            *self.input_shape[0:2], interpolation="bilinear")(x)
-
         return x
 
     def Decoder_only_DCNN(self, inputs, first_upsample_size):
@@ -267,19 +264,6 @@ class DeeplabV3Plus:
         x = DeeplabV3Plus._SepConv_BN(x, 256, 'decoder_conv1',
                                       depth_activation=True, epsilon=1e-5)
 
-        # Final Convolution for class prediction
-        if self.classes == 21 and self.weights == 'pascal_voc':
-            last_layer_name = 'logits_semantic'
-        else:
-            last_layer_name = 'custom_logits_semantic'
-
-        x = Conv2D(self.classes, (1, 1), padding='same',
-                   name=last_layer_name)(x)
-
-        # Bilinear upsample to input shape
-        x = tf.keras.layers.Resizing(
-            *self.input_shape[0:2], interpolation="bilinear")(x)
-
         return x
 
     def Decoder_only_ASPP(self, inputs, first_upsample_size):
@@ -294,6 +278,9 @@ class DeeplabV3Plus:
         x = DeeplabV3Plus._SepConv_BN(x, 256, 'decoder_conv1',
                                       depth_activation=True, epsilon=1e-5)
 
+        return x
+
+    def Final_Class_Prediction(self, inputs):
         # Final Convolution for class prediction
         if self.classes == 21 and self.weights == 'pascal_voc':
             last_layer_name = 'logits_semantic'
@@ -301,7 +288,7 @@ class DeeplabV3Plus:
             last_layer_name = 'custom_logits_semantic'
 
         x = Conv2D(self.classes, (1, 1), padding='same',
-                   name=last_layer_name)(x)
+                   name=last_layer_name)(inputs)
 
         # Bilinear upsample to input shape
         x = tf.keras.layers.Resizing(

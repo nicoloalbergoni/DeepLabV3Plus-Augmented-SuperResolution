@@ -1,3 +1,4 @@
+import os
 import tensorflow as tf
 from model import DeeplabV3Plus
 
@@ -15,8 +16,14 @@ def main(plot_model=False):
         reshape_outputs=False).build_model(only_DCNN_output=False, only_ASPP_output=False)
 
     if plot_model:
+
+        MODELS_PLOT_DIR = os.path.join(os.getcwd(), "model_plots")
+
+        if not os.path.exists(MODELS_PLOT_DIR):
+            os.makedirs(MODELS_PLOT_DIR)
+
         tf.keras.utils.plot_model(
-            model, to_file=f'./{model.name}.png', show_shapes=True, show_dtype=False,
+            model, to_file=f'{MODELS_PLOT_DIR}/{model.name}.png', show_shapes=True, show_dtype=False,
             show_layer_names=True, rankdir='TB', show_layer_activations=False)
 
 
