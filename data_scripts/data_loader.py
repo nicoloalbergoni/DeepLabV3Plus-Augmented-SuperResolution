@@ -9,7 +9,7 @@ class DataLoader(object):
     """A TensorFlow Dataset API based loader for semantic segmentation problems."""
 
     def __init__(self, root_folder, image_size=(512, 512), mode="train", reshape_masks=False,
-                 channels=(3, 3), crop_percent=None, seed=None,
+                 channels=(3, 3), crop_percent=None, seed=None, use_berkley=False,
                  augment=True, compose=False, one_hot_encoding=False, palette=None):
         """
         Initializes the data loader object
@@ -30,13 +30,15 @@ class DataLoader(object):
         self.root_folder = root_folder
         self.reshape_masks = reshape_masks
         self.mode = mode
-        self.image_paths = self._get_img_paths()
+        self.use_berkley = use_berkley
         self.palette = palette
         self.image_size = image_size
         self.augment = augment
         self.compose = compose
         self.one_hot_encoding = one_hot_encoding
         self.channels = channels
+
+        self.image_paths = self._get_img_paths()
 
         if crop_percent is not None:
             if 0.0 < crop_percent <= 1.0:
@@ -64,9 +66,14 @@ class DataLoader(object):
         :param dataset_path: The root path of the dataset.
         :return: The list of image base names for either the training, validation, or test set.
         """
-        filename = os.path.join(self.root_folder, "ImageSets", "Segmentation",
-                                "train.txt" if self.mode == "train" else "val.txt")
-        return [os.path.join(self.root_folder, "JPEGImages", line.rstrip() + ".jpg") for line in open(filename)]
+        if self.use_berkley:
+            file_list_path = os.path.join(os.getcwd(), "data", "augmented_file_lists",
+                                "trainaug.txt" if self.mode == "train" else "valaug.txt")
+        else:
+            file_list_path = os.path.join(self.root_folder, "ImageSets", "Segmentation",
+                                    "train.txt" if self.mode == "train" else "val.txt")
+
+        return [os.path.join(self.root_folder, "JPEGImages", line.rstrip() + ".jpg") for line in open(file_list_path)]
 
     def _corrupt_brightness(self, image, mask):
         """
@@ -155,7 +162,7 @@ class DataLoader(object):
         """
         image_content = tf.io.read_file(image_path)
         mask_path = tf.strings.regex_replace(
-            image_path, "JPEGImages", "SegmentationClassRaw")
+            image_path, "JPEGImages", "SegmentationClassRaw" if not self.use_berkley else "SegmentationClassAug")
         mask_path = tf.strings.regex_replace(mask_path, "jpg", "png")
         mask_content = tf.io.read_file(mask_path)
 

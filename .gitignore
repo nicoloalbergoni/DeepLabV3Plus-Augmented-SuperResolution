@@ -285,5 +285,7 @@ pip-selfcheck.json
 # PERSONAL 
 model/
 .idea
-data/
+data/*
+!data/augmented_file_lists
+!data/berkley_file_lists
 logs/

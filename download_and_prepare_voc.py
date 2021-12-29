@@ -16,25 +16,28 @@ parser.add_argument(
 parser.add_argument("--pascal_root", help="Root directory of the PASCAL VOC dataset", nargs='?',
                     type=str, default="./data/VOCdevkit/VOC2012", const="./data/VOCdevkit/VOC2012")
 
+parser.add_argument(
+    "--download_berkley", help="Download the augmented dataset provided by Berkley", action="store_true")
+
 args = parser.parse_args()
 
 
 def main():
-    BASE_DIR = os.getcwd()
-    # DATASET_URL = "https://data.deepai.org/PascalVOC2012.zip"
-
     if args.use_mirror:
         DATASET_URL = "http://pjreddie.com/media/files/VOCtrainval_11-May-2012.tar"
     else:
         DATASET_URL = "http://host.robots.ox.ac.uk/pascal/VOC/voc2012/VOCtrainval_11-May-2012.tar"
 
-    DATA_DIR = os.path.join(BASE_DIR, "data")
-    # PASCAL_ROOT = os.path.join(DATA_DIR, "VOCdevkit", "VOC2012")
+    DATA_DIR = os.path.join(os.getcwd(), "data")
     PASCAL_ROOT = os.path.normpath(args.pascal_root)
 
     filepath = download_dataset(DATASET_URL, DATA_DIR)
-
     extract_file(filepath, DATA_DIR, is_extracted=PASCAL_ROOT)
+
+    if args.download_berkley:
+        BERKLEY_URL = "https://www.dropbox.com/s/oeu149j8qtbs1x0/SegmentationClassAug.zip?dl=1"
+        filepath = download_dataset(BERKLEY_URL, DATA_DIR)
+        extract_file(filepath, PASCAL_ROOT, is_extracted=os.path.join(PASCAL_ROOT, "SegmentationClassAug"))
 
     if args.remove_cmap:
         SEG_FOLDER = os.path.join(PASCAL_ROOT, "SegmentationClass")
