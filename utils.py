@@ -28,6 +28,15 @@ def plot_prediction(display_list, only_prediction=True, show_overlay=True):
     plt.show()
 
 
+def plot_images(image_list, rows, columns):
+    for i in range(len(image_list)):
+        plt.subplot(rows, columns, i + 1)
+        plt.imshow(tf.keras.preprocessing.image.array_to_img(
+            image_list[i]))
+        plt.axis('off')
+    plt.show()
+
+
 def sparse_crossentropy_ignoring_last_label(y_true, y_pred):
     nb_classes = (y_pred.shape.as_list())[-1]
     y_true = tf.one_hot(

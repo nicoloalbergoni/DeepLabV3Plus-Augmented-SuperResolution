@@ -58,7 +58,7 @@ class DeeplabV3Plus:
 
         self.input_tensor = input_tensor
 
-    def build_model(self, only_DCNN_output=False, only_ASPP_output=False, first_upsample_size=(128, 128)):
+    def build_model(self, only_DCNN_output=False, only_ASPP_output=False, first_upsample_size=(128, 128), final_upsample=True):
 
         if self.backbone == "xception" and only_DCNN_output is True and only_ASPP_output is True:
             raise ValueError("Both only_DCNN_output and only_ASPP_output cannot be True at \
@@ -95,7 +95,7 @@ class DeeplabV3Plus:
             decoder_output = self.AtrousSpatialPyramidPooling(encoder_output)
             model_name = model_name_prefix
 
-        final_output = self.Final_Class_Prediction(decoder_output)
+        final_output = self.Final_Class_Prediction(decoder_output, final_upsample)
 
         # Ensure that the model takes into account
         # any potential predecessors of `input_tensor`.
@@ -280,7 +280,7 @@ class DeeplabV3Plus:
 
         return x
 
-    def Final_Class_Prediction(self, inputs):
+    def Final_Class_Prediction(self, inputs, final_upsample):
         # Final Convolution for class prediction
         if self.classes == 21 and self.weights == 'pascal_voc':
             last_layer_name = 'logits_semantic'
@@ -290,9 +290,10 @@ class DeeplabV3Plus:
         x = Conv2D(self.classes, (1, 1), padding='same',
                    name=last_layer_name)(inputs)
 
-        # Bilinear upsample to input shape
-        x = tf.keras.layers.Resizing(
-            *self.input_shape[0:2], interpolation="bilinear")(x)
+        if final_upsample:
+            # Bilinear upsample to input shape
+            x = tf.keras.layers.Resizing(
+                *self.input_shape[0:2], interpolation="bilinear")(x)
 
         return x
 
