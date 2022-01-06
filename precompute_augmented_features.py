@@ -1,18 +1,10 @@
 import os
+from tqdm import tqdm
 import numpy as np
 import tensorflow as tf
 import tensorflow_addons as tfa
 from model import DeeplabV3Plus
-from utils import plot_images, plot_prediction
-
-
-def load_image(img_path, image_size=(512, 512)):
-    raw_img = tf.io.read_file(img_path)
-    image = tf.image.decode_jpeg(raw_img, channels=3)
-    image = tf.image.resize(image, image_size)
-    image = tf.cast(image, tf.float32) / 255.0
-
-    return image
+from utils import plot_images, plot_prediction, load_image, create_mask
 
 
 def augment_images(batched_images, angles, shifts):
@@ -22,47 +14,61 @@ def augment_images(batched_images, angles, shifts):
     return translated_images
 
 
-def create_mask(pred_mask: tf.Tensor) -> tf.Tensor:
-    # pred_mask -> [IMG_SIZE, IMG_SIZE, N_CLASS]
-    pred_mask = tf.argmax(pred_mask, axis=-1)
-    pred_mask = tf.expand_dims(pred_mask, axis=-1)  # add 1 dim for plotting
-    return pred_mask
-
-
 def save_augmented_features(model, images_array, dest_folder):
     if not os.path.exists(dest_folder):
         os.mkdir(dest_folder)
 
-    predictions = model.predict(images_array)
+    base_name = os.path.basename(os.path.normpath(dest_folder))
+
+    predictions = model.predict(images_array, batch_size=2)
 
     for i, prediction in enumerate(predictions):
         mask = create_mask(prediction)
-        tf.keras.utils.save_img(f"{dest_folder}/{i}.png", mask)
+        tf.keras.utils.save_img(f"{dest_folder}/{base_name}_{i}.png", mask)
 
     return predictions
 
 
+def get_img_paths(image_list_path, image_folder):
+    return [os.path.join(image_folder, line.rstrip() + ".jpg") for line in open(image_list_path)]
+
+
+def precompute_augmented_features(image_path_list, dest_root_folder, model, num_aug=100, angle_max=0.5, shift_max=30):
+    for image_path in tqdm(image_path_list):
+        image = load_image(image_path, image_size=(512, 512), normalize=True)
+        batched_image = tf.tile(tf.expand_dims(image, 0), [num_aug, 1, 1, 1])  # Size [num_aug, 512, 512, 3]
+        angles = np.random.uniform(-angle_max, angle_max, num_aug)
+        shifts = np.random.uniform(-shift_max, shift_max, (num_aug, 2))
+        # First sample is not augmented
+        angles[0] = 0
+        shifts[0] = np.array([0, 0])
+        angles = angles.astype("float32")
+        shifts = shifts.astype("float32")
+
+        augmented_images = augment_images(batched_image, angles, shifts)
+
+        image_name = os.path.splitext(os.path.basename(image_path))[0]
+        dest_folder = os.path.join(dest_root_folder, image_name)
+
+        save_augmented_features(model, augmented_images, dest_folder=dest_folder)
+        np.save(os.path.join(dest_folder, f"{image_name}_angles"), angles)
+        np.save(os.path.join(dest_folder, f"{image_name}_shifts"), shifts)
+
+
 def main():
-    num_aug = 100
-
     # augmentation parameters
-    angle_min = -0.5  # in radians
-    angle_max = 0.5
-    angles = np.random.uniform(angle_min, angle_max, num_aug)
-    shift_min = -30
+    num_aug = 50
+    angle_max = 0.5  # in radians
     shift_max = 30
-    shifts = np.random.uniform(shift_min, shift_max, (num_aug, 2))
-    # first Grad-CAM is not augmented
-    angles[0] = 0
-    shifts[0] = np.array([0, 0])
-    angles = angles.astype("float32")
-    shifts = shifts.astype("float32")
 
-    test_image_path = os.path.join(os.getcwd(), "test_img.jpg")
-    image = load_image(test_image_path)
-    batched_images = tf.tile(tf.expand_dims(image, 0), [num_aug, 1, 1, 1])  # Size [100, 512, 512, 3]
+    data_root = os.path.join(os.getcwd(), "data")
+    image_list_path = os.path.join(data_root, "augmented_file_lists", "valaug.txt")
+    image_folder_path = os.path.join(data_root, "VOCdevkit", "VOC2012", "JPEGImages")
+    image_paths = get_img_paths(image_list_path, image_folder_path)[:100]
 
-    augmented_images = augment_images(batched_images, angles, shifts)
+    dest_root_folder = os.path.join(data_root, "precomputed_features")
+    if not os.path.exists(dest_root_folder):
+        os.mkdir(dest_root_folder)
 
     model = DeeplabV3Plus(
         input_shape=(512, 512, 3),
@@ -73,10 +79,8 @@ def main():
         backbone="mobilenet",
         alpha=1.).build_model(final_upsample=False)
 
-    dest_folder = "test_folder"
-    predictions = save_augmented_features(model, augmented_images, dest_folder=dest_folder)
-    np.save(os.path.join(dest_folder, "angles"), angles)
-    np.save(os.path.join(dest_folder, "shifts"), shifts)
+    precompute_augmented_features(image_paths, dest_root_folder, model, num_aug=num_aug,
+                                  angle_max=angle_max, shift_max=shift_max)
 
     # sample_image = augmented_images[67]
     # sample_mask = create_mask(predictions[67])

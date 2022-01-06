@@ -80,3 +80,31 @@ def sparse_Mean_IOU(y_true, y_pred):
     legal_labels = ~tf.math.is_nan(iou)
     iou = tf.gather(iou, indices=tf.where(legal_labels))
     return tf.reduce_mean(iou)
+
+
+def load_image(img_path, image_size=None, normalize=True, is_png=False):
+    raw_img = tf.io.read_file(img_path)
+
+    # Defaults to jpg images
+    if not is_png:
+        image = tf.image.decode_jpeg(raw_img, channels=3)
+    else:
+        image = tf.image.decode_png(raw_img, channels=1)
+
+    # Resize only if size is specified
+    if image_size is not None:
+        image = tf.image.resize(image, image_size)
+
+    image = tf.cast(image, tf.float32)
+
+    if normalize:
+        image = image / 255.0
+
+    return image
+
+
+def create_mask(pred_mask):
+    # pred_mask -> [IMG_SIZE, IMG_SIZE, N_CLASS]
+    pred_mask = tf.argmax(pred_mask, axis=-1)
+    pred_mask = tf.expand_dims(pred_mask, axis=-1)  # add 1 dim for plotting
+    return pred_mask
