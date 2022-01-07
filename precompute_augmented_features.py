@@ -1,10 +1,16 @@
 import os
+import argparse
 from tqdm import tqdm
 import numpy as np
 import tensorflow as tf
 import tensorflow_addons as tfa
 from model import DeeplabV3Plus
 from utils import plot_images, plot_prediction, load_image, create_mask
+
+parser = argparse.ArgumentParser()
+parser.add_argument("num_aug", help="Number of augmented copies")
+
+args = parser.parse_args()
 
 
 def augment_images(batched_images, angles, shifts):
@@ -18,13 +24,11 @@ def save_augmented_features(model, images_array, dest_folder):
     if not os.path.exists(dest_folder):
         os.mkdir(dest_folder)
 
-    base_name = os.path.basename(os.path.normpath(dest_folder))
-
     predictions = model.predict(images_array, batch_size=2)
 
     for i, prediction in enumerate(predictions):
         mask = create_mask(prediction)
-        tf.keras.utils.save_img(f"{dest_folder}/{base_name}_{i}.png", mask)
+        tf.keras.utils.save_img(f"{dest_folder}/{i}.png", mask)
 
     return predictions
 
@@ -57,14 +61,16 @@ def precompute_augmented_features(image_path_list, dest_root_folder, model, num_
 
 def main():
     # augmentation parameters
-    num_aug = 50
+    num_aug = args.num_aug
+
+    #TODO: Set this as optional arguments
     angle_max = 0.5  # in radians
     shift_max = 30
 
     data_root = os.path.join(os.getcwd(), "data")
     image_list_path = os.path.join(data_root, "augmented_file_lists", "valaug.txt")
     image_folder_path = os.path.join(data_root, "VOCdevkit", "VOC2012", "JPEGImages")
-    image_paths = get_img_paths(image_list_path, image_folder_path)[:100]
+    image_paths = get_img_paths(image_list_path, image_folder_path)[:50]
 
     dest_root_folder = os.path.join(data_root, "precomputed_features")
     if not os.path.exists(dest_root_folder):

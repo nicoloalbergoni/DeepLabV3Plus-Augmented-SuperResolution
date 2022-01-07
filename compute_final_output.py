@@ -1,18 +1,26 @@
 import os
+import argparse
 import numpy as np
 import tensorflow as tf
 from tqdm import tqdm
 from superresolution import Superresolution
 from utils import plot_images, plot_prediction, load_image
 
+parser = argparse.ArgumentParser()
+parser.add_argument("num_aug", help="Number of augmented copies")
+
+args = parser.parse_args()
+
 
 def load_images(img_folder):
     images = []
+    # Sort images based on their filename which is an integer indicating the augmented copy number
+    image_list = sorted([name.replace(".png", "") for name in os.listdir(img_folder) if ".npy" not in name], key=int)
 
-    for img_name in os.listdir(img_folder):
+    for img_name in image_list:
         if ".npy" in img_name:
             continue
-        image = load_image(os.path.join(img_folder, img_name), normalize=False, is_png=True)
+        image = load_image(os.path.join(img_folder, f"{img_name}.png"), normalize=False, is_png=True)
         images.append(image)
 
     return images
@@ -50,7 +58,7 @@ def compute_save_final_output(superresolution_obj, precomputed_features_folders,
 
 def main():
     # augmentation parameters
-    num_aug = 50
+    num_aug = args.num_aug
 
     # super resolution parameters
     learning_rate = 1e-3

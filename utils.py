@@ -82,7 +82,7 @@ def sparse_Mean_IOU(y_true, y_pred):
     return tf.reduce_mean(iou)
 
 
-def load_image(img_path, image_size=None, normalize=True, is_png=False):
+def load_image(img_path, image_size=None, normalize=True, is_png=False, resize_method="bilinear"):
     raw_img = tf.io.read_file(img_path)
 
     # Defaults to jpg images
@@ -93,7 +93,7 @@ def load_image(img_path, image_size=None, normalize=True, is_png=False):
 
     # Resize only if size is specified
     if image_size is not None:
-        image = tf.image.resize(image, image_size)
+        image = tf.image.resize(image, image_size, method=resize_method)
 
     image = tf.cast(image, tf.float32)
 
