@@ -8,12 +8,13 @@ from model import DeeplabV3Plus
 from utils import plot_images, plot_prediction, load_image, create_mask
 
 parser = argparse.ArgumentParser()
-parser.add_argument("num_aug", help="Number of augmented copies")
+parser.add_argument("num_aug", help="Number of augmented copies", type=int)
 
 args = parser.parse_args()
 
 
 def augment_images(batched_images, angles, shifts):
+
     rotated_images = tfa.image.rotate(batched_images, angles, interpolation="bilinear")
     translated_images = tfa.image.translate(rotated_images, shifts, interpolation="bilinear")
 
@@ -28,7 +29,7 @@ def save_augmented_features(model, images_array, dest_folder):
 
     for i, prediction in enumerate(predictions):
         mask = create_mask(prediction)
-        tf.keras.utils.save_img(f"{dest_folder}/{i}.png", mask)
+        tf.keras.utils.save_img(f"{dest_folder}/{i}.png", mask, scale=False)
 
     return predictions
 
@@ -40,7 +41,7 @@ def get_img_paths(image_list_path, image_folder):
 def precompute_augmented_features(image_path_list, dest_root_folder, model, num_aug=100, angle_max=0.5, shift_max=30):
     for image_path in tqdm(image_path_list):
         image = load_image(image_path, image_size=(512, 512), normalize=True)
-        batched_image = tf.tile(tf.expand_dims(image, 0), [num_aug, 1, 1, 1])  # Size [num_aug, 512, 512, 3]
+        batched_image = tf.tile(tf.expand_dims(image, axis=0), [num_aug, 1, 1, 1])  # Size [num_aug, 512, 512, 3]
         angles = np.random.uniform(-angle_max, angle_max, num_aug)
         shifts = np.random.uniform(-shift_max, shift_max, (num_aug, 2))
         # First sample is not augmented
@@ -70,7 +71,7 @@ def main():
     data_root = os.path.join(os.getcwd(), "data")
     image_list_path = os.path.join(data_root, "augmented_file_lists", "valaug.txt")
     image_folder_path = os.path.join(data_root, "VOCdevkit", "VOC2012", "JPEGImages")
-    image_paths = get_img_paths(image_list_path, image_folder_path)[:50]
+    image_paths = get_img_paths(image_list_path, image_folder_path)[:20]
 
     dest_root_folder = os.path.join(data_root, "precomputed_features")
     if not os.path.exists(dest_root_folder):
