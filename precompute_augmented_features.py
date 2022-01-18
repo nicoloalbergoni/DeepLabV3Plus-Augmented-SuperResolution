@@ -5,7 +5,7 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_addons as tfa
 from model import DeeplabV3Plus
-from utils import plot_images, plot_prediction, load_image, create_mask
+from utils import plot_images, plot_prediction, load_image, create_mask, get_img_paths
 
 parser = argparse.ArgumentParser()
 parser.add_argument("num_aug", help="Number of augmented copies", type=int)
@@ -32,10 +32,6 @@ def save_augmented_features(model, images_array, dest_folder):
         tf.keras.utils.save_img(f"{dest_folder}/{i}.png", mask, scale=False)
 
     return predictions
-
-
-def get_img_paths(image_list_path, image_folder):
-    return [os.path.join(image_folder, line.rstrip() + ".jpg") for line in open(image_list_path)]
 
 
 def precompute_augmented_features(image_path_list, dest_root_folder, model, num_aug=100, angle_max=0.5, shift_max=30):
