@@ -46,14 +46,14 @@ class Superresolution:
         target_image = tf.Variable(tf.zeros([1, self.output_size[0], self.output_size[1], 1]), name="Target_Image")
         trainable_vars = [target_image]
 
-        # Optimizer
         for i in range(self.num_iter):
             # optimizer.minimize(lambda: self.loss_function(target_image, augmented_samples), var_list=[target_image])
             with tf.GradientTape() as tape:
                 loss = self.loss_function(target_image, augmented_samples, angles, shifts)
-                print(f"{i + 1}/{self.num_iter} -- loss = {loss}")
+                if i % 10 == 0 or i == self.num_iter - 1:
+                    print(f"{i + 1}/{self.num_iter} -- loss = {loss}")
 
             gradients = tape.gradient(loss, trainable_vars)
             optimizer.apply_gradients(zip(gradients, trainable_vars))
 
-        return target_image
+        return target_image, loss
