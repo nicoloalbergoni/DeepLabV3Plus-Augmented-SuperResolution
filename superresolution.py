@@ -4,7 +4,7 @@ import tensorflow_addons as tfa
 
 class Superresolution:
     def __init__(self, lambda_tv, lambda_eng, num_iter=200, learning_rate=1e-3,
-                 feature_size=(64, 64), output_size=(512, 512), num_aug=100):
+                 feature_size=(64, 64), output_size=(512, 512), num_aug=100, verbose=False):
         self.num_iter = num_iter
         self.lambda_eng = lambda_eng
         self.lambda_tv = lambda_tv
@@ -12,6 +12,7 @@ class Superresolution:
         self.output_size = output_size
         self.feature_size = feature_size
         self.learning_rate = learning_rate
+        self.verbose = verbose
 
     @tf.function
     def loss_function(self, target_image, augmented_samples, angles, shifts):
@@ -50,10 +51,13 @@ class Superresolution:
             # optimizer.minimize(lambda: self.loss_function(target_image, augmented_samples), var_list=[target_image])
             with tf.GradientTape() as tape:
                 loss = self.loss_function(target_image, augmented_samples, angles, shifts)
-                if i % 10 == 0 or i == self.num_iter - 1:
+
+                if self.verbose and (i % 10 == 0 or i == self.num_iter - 1):
                     print(f"{i + 1}/{self.num_iter} -- loss = {loss}")
 
             gradients = tape.gradient(loss, trainable_vars)
             optimizer.apply_gradients(zip(gradients, trainable_vars))
+
+        print(f"Final loss: {loss}")
 
         return target_image, loss

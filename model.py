@@ -290,11 +290,11 @@ class DeeplabV3Plus:
         x = Conv2D(self.classes, (1, 1), padding='same',
                    name=last_layer_name)(inputs)
 
+
         if final_upsample:
             # Bilinear upsample to input shape
             x = tf.keras.layers.Resizing(
                 *self.input_shape[0:2], interpolation="bilinear")(x)
-
         return x
 
     def EntryBlockMobile(self, inputs):
@@ -303,7 +303,7 @@ class DeeplabV3Plus:
         pointwise_filters = DeeplabV3Plus._make_divisible(pointwise_conv_filters, 8)
         prefix = "expanded_conv_"
 
-        # First concolution
+        # First convolution
         x = Conv2D(first_block_filters,
                    kernel_size=3,
                    strides=(2, 2), padding='same', use_bias=False,

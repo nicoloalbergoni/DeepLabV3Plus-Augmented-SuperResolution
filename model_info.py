@@ -26,6 +26,8 @@ def main(plot_model=False):
             model, to_file=f'{MODELS_PLOT_DIR}/{model.name}.png', show_shapes=True, show_dtype=False,
             show_layer_names=True, rankdir='TB', show_layer_activations=False)
 
+    print(model.summary())
+
 
 if __name__ == '__main__':
-    main(plot_model=True)
+    main(plot_model=False)
