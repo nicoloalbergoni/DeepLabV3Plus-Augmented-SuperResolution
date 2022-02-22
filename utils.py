@@ -115,18 +115,14 @@ def create_mask(pred_mask):
     return pred_mask
 
 
-def get_img_paths(image_list_path, image_folder, is_png=False):
-    """
-    Given a file containing image identifiers returns the complete path to the image in the specified folder
+def get_prediction(model, input_image):
 
-    Args:
-        image_list_path: Path to the file containing the image-names list
-        image_folder: Path to the folder containing the images
-        is_png: Type of the images (jpg or png)
+    prediction = model.predict(input_image[tf.newaxis, ...])
+    mask = create_mask(prediction[0])
 
-    Returns: List of full paths to the images
-    """
-    ext = ".jpg" if not is_png else ".png"
-    return [os.path.join(image_folder, line.rstrip() + ext) for line in open(image_list_path)]
+    return mask
+
+
+
 
 
