@@ -58,6 +58,4 @@ class Superresolution:
             gradients = tape.gradient(loss, trainable_vars)
             optimizer.apply_gradients(zip(gradients, trainable_vars))
 
-        print(f"Final loss: {loss}")
-
         return target_image, loss

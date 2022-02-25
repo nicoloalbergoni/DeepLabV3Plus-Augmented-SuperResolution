@@ -45,12 +45,11 @@ def filter_by_class(img_paths, class_id, image_size=(512, 512)):
 
 
 def min_max_normalization(image, new_min=0.0, new_max=255.0, global_min=None, global_max=None):
-
     min = image.min() if global_min is None else global_min
     max = image.max() if global_max is None else global_max
 
     num = (image - min) * (new_max - new_min)
-    den = max - min
+    den = (max - min) if (max - min) != 0 else 1.0
     return new_min + (num / den)
 
 
@@ -99,3 +98,24 @@ def print_labels(masks):
     for i in range(2):
         values, count = np.unique(masks[i], return_counts=True)
         print(title[i] + str(dict(zip(values, count))))
+
+
+def list_precomputed_data_paths(root_dir):
+    paths = []
+
+    for path, subdirs, files in os.walk(root_dir):
+        for filename in files:
+            if filename.endswith(".hdf5"):
+                paths.append(os.path.join(path, filename))
+
+    return paths
+
+
+def check_hdf5_validity(file, num_aug=100):
+    # Check if all datasets in the file have the right cardinality
+    for keys in file:
+        num = file[keys].shape[0]
+        if num != num_aug:
+            return False
+
+    return True
