@@ -4,7 +4,7 @@ import tensorflow_addons as tfa
 
 class Superresolution:
     def __init__(self, lambda_tv, lambda_eng, num_iter=200, learning_rate=1e-3,
-                 feature_size=(64, 64), output_size=(512, 512), num_aug=100, verbose=False):
+                 feature_size=(64, 64), output_size=(512, 512), num_aug=100, verbose=False, loss_coeff=False):
         self.num_iter = num_iter
         self.lambda_eng = lambda_eng
         self.lambda_tv = lambda_tv
@@ -13,6 +13,7 @@ class Superresolution:
         self.feature_size = feature_size
         self.learning_rate = learning_rate
         self.verbose = verbose
+        self.loss_coeff = loss_coeff
 
     @tf.function
     def loss_function(self, target_image, augmented_samples, angles, shifts):
@@ -37,6 +38,11 @@ class Superresolution:
         # Loss definition
         partial_loss = tf.add(df, tv_lambda)
         loss = tf.add(partial_loss, norm_mu)
+
+        if self.loss_coeff:
+            #TODO: WIP
+            loss = tf.scalar_mul(0.5, loss)
+
         return loss
 
     def compute_output(self, augmented_samples, angles, shifts):
