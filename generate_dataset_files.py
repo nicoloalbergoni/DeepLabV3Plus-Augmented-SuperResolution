@@ -1,3 +1,8 @@
+"""
+This script is used to generate the files that contain the lists of image filenames (both for training and validation)
+of the augmented version of Pascal VOC 2012 (i.e. with the data provided by Berkley University)
+"""
+
 import os
 
 
