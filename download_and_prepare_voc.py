@@ -14,7 +14,7 @@ parser.add_argument(
     "--use_mirror", help="Download the dataser from a mirror site", action="store_true")
 
 parser.add_argument("--pascal_root", help="Root directory of the PASCAL VOC dataset", nargs='?',
-                    type=str, default="./data/VOCdevkit/VOC2012", const="./data/VOCdevkit/VOC2012")
+                    type=str, default="./data/dataset_root/VOCdevkit/VOC2012", const="./data/dataset_root/VOCdevkit/VOC2012")
 
 parser.add_argument(
     "--download_berkley", help="Download the augmented dataset provided by Berkley", action="store_true")
@@ -29,23 +29,24 @@ def main():
         DATASET_URL = "http://host.robots.ox.ac.uk/pascal/VOC/voc2012/VOCtrainval_11-May-2012.tar"
 
     DATA_DIR = os.path.join(os.getcwd(), "data")
+    DATASET_ROOT = os.path.join(DATA_DIR, "dataset_root")
     PASCAL_ROOT = os.path.normpath(args.pascal_root)
 
-    filepath = download_dataset(DATASET_URL, DATA_DIR)
-    extract_file(filepath, DATA_DIR, is_extracted=PASCAL_ROOT)
+    filepath = download_dataset(DATASET_URL, dest_folder=DATASET_ROOT)
+    extract_file(filepath, dest_folder=DATASET_ROOT, is_extracted=PASCAL_ROOT)
 
     if args.download_berkley:
         BERKLEY_URL = "https://www.dropbox.com/s/oeu149j8qtbs1x0/SegmentationClassAug.zip?dl=1"
-        filepath = download_dataset(BERKLEY_URL, DATA_DIR)
-        extract_file(filepath, PASCAL_ROOT, is_extracted=os.path.join(PASCAL_ROOT, "SegmentationClassAug"))
+        filepath = download_dataset(BERKLEY_URL, DATASET_ROOT)
+        extract_file(filepath, dest_folder=PASCAL_ROOT, is_extracted=os.path.join(PASCAL_ROOT, "SegmentationClassAug"))
 
     if args.remove_cmap:
         SEG_FOLDER = os.path.join(PASCAL_ROOT, "SegmentationClass")
         SEMANTIC_SEG_FOLDER = os.path.join(PASCAL_ROOT, "SegmentationClassRaw")
-        remove_gt_colormap(SEG_FOLDER, SEMANTIC_SEG_FOLDER)
+        remove_gt_colormap(SEG_FOLDER, output_dir=SEMANTIC_SEG_FOLDER)
 
     if args.generate_tf_records:
-        TF_RECORDS_DIR = os.path.join(DATA_DIR, "TFRecords")
+        TF_RECORDS_DIR = os.path.join(DATASET_ROOT, "TFRecords")
         dataset = PascalVOC2012Dataset(augmentation_params=None)
         train_basenames = dataset.get_basenames('train', PASCAL_ROOT)
         print('Found', len(train_basenames), 'training samples')
@@ -54,10 +55,10 @@ def main():
         print('Found', len(val_basenames), 'validation samples')
 
         # Export train and validation datasets to TFRecords
-        dataset.export_tfrecord('train', PASCAL_ROOT, TF_RECORDS_DIR,
-                                'segmentation_train.tfrecords')
-        dataset.export_tfrecord('val', PASCAL_ROOT, TF_RECORDS_DIR,
-                                'segmentation_val.tfrecords')
+        dataset.export_tfrecord('train', dataset_path=PASCAL_ROOT, tf_record_dest_dir=TF_RECORDS_DIR,
+                                tfrecord_filename='segmentation_train.tfrecords')
+        dataset.export_tfrecord('val', dataset_path=PASCAL_ROOT, tf_record_dest_dir=TF_RECORDS_DIR,
+                                tfrecord_filename='segmentation_val.tfrecords')
         print('Finished exporting')
 
 

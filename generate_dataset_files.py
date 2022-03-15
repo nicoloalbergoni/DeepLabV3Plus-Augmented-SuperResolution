@@ -35,7 +35,7 @@ def write_list_to_file(file_path, data_list):
 
 def main():
     DATA_ROOT = os.path.join(os.getcwd(), "data")
-    PASCAL_ROOT = os.path.join(DATA_ROOT, "VOCdevkit", "VOC2012")
+    PASCAL_ROOT = os.path.join(DATA_ROOT, "dataset_root", "VOCdevkit", "VOC2012")
     BERKLEY_ROOT = os.path.join(DATA_ROOT, "berkley_file_lists")
     OUTPUT_FOLDER = os.path.join(DATA_ROOT, "augmented_file_lists")
 

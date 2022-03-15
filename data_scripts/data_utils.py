@@ -17,7 +17,7 @@ def download_dataset(dataset_url, dest_folder):
     full_dest_path = os.path.join(dest_folder, filename)
 
     if not os.path.exists(dest_folder):
-        os.mkdir(dest_folder)
+        os.makedirs(dest_folder)
 
     if os.path.exists(full_dest_path):
         print(f"File {filename} already in destination folder, skipping download")
@@ -38,7 +38,7 @@ def download_dataset(dataset_url, dest_folder):
     return filepath
 
 
-def extract_file(filepath, dest_folder, is_extracted="./data/VOC2101"):
+def extract_file(filepath, dest_folder, is_extracted="./data/dataset_root/VOCdevkit"):
 
     # TODO: Find a better way to understand when to skip unzip even for different datasets
     if os.path.exists(is_extracted):
