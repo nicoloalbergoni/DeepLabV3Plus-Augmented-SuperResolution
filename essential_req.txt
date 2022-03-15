@@ -1,0 +1,12 @@
+autopep8
+jupyter
+keras-tuner
+opencv-python
+pip-chill
+pydot
+scikit-learn
+seaborn
+tensorflow
+tensorflow-addons
+tqdm
+wandb

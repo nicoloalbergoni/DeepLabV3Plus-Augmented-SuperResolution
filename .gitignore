@@ -290,3 +290,4 @@ data/*
 !data/berkley_file_lists
 !data/pascal_classes.txt
 logs/
+wandb/
