@@ -9,6 +9,8 @@ from tensorflow.keras.utils import get_source_inputs
 WEIGHTS_PATH_XCEPTION = "https://github.com/bonlime/keras-deeplab-v3-plus/releases/download/1.1/deeplabv3_xception_tf_dim_ordering_tf_kernels.h5"
 WEIGHTS_PATH_MOBILE = "https://github.com/bonlime/keras-deeplab-v3-plus/releases/download/1.1/deeplabv3_mobilenetv2_tf_dim_ordering_tf_kernels.h5"
 
+DATA_DIR = os.path.join(os.getcwd(), "data")
+DEFAULT_WEIGHTS_FOLDER = os.path.join(DATA_DIR, "model_weights")
 
 class DeeplabV3Plus:
     def __init__(self, weights='pascal_voc', input_tensor=None, input_shape=(512, 512, 3), classes=21, OS=16,
@@ -114,19 +116,19 @@ class DeeplabV3Plus:
         model = Model(inputs, final_output, name=model_name)
 
         if self.load_weights:
-            if not os.path.exists("model"):
-                os.mkdir("model")
+            if not os.path.exists(DEFAULT_WEIGHTS_FOLDER):
+                os.makedirs(DEFAULT_WEIGHTS_FOLDER)
 
             if self.backbone == "xception":
                 weights_path = get_file('deeplabv3_xception_tf_dim_ordering_tf_kernels.h5',
                                         WEIGHTS_PATH_XCEPTION,
-                                        cache_dir="model",
+                                        cache_dir=DEFAULT_WEIGHTS_FOLDER,
                                         cache_subdir="")
 
             else:
                 weights_path = get_file('deeplabv3_mobilenetv2_tf_dim_ordering_tf_kernels.h5',
                                         WEIGHTS_PATH_MOBILE,
-                                        cache_dir="model",
+                                        cache_dir=DEFAULT_WEIGHTS_FOLDER,
                                         cache_subdir="")
 
             model.load_weights(weights_path, by_name=True, skip_mismatch=True)
