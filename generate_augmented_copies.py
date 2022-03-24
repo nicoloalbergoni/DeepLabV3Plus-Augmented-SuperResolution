@@ -18,15 +18,16 @@ STANDARD_OUTPUT_DIR = os.path.join(SUPERRES_ROOT, "standard_output")
 
 SEED = 1234
 
-tf.random.set_seed(SEED)
 np.random.seed(SEED)
+tf.random.set_seed(SEED)
 
 IMG_SIZE = (512, 512)
-BATCH_SIZE = 5
+BATCH_SIZE = 4
 CLASSES = 21
 NUM_AUG = 100
 CLASS_ID = 8
-NUM_SAMPLES = None
+NUM_SAMPLES = 1500
+MODE = "slice"
 
 
 def compute_standard_output(image_dict, model, dest_folder, filter_class_id=None):
@@ -203,7 +204,7 @@ def main():
     shift_max = 30
 
     print("Generating augmented copies...")
-    compute_augmented_features(images_dict, model_no_upsample, mode="slice",
+    compute_augmented_features(images_dict, model_no_upsample, mode=MODE,
                                dest_folder=PRECOMPUTED_OUTPUT_DIR, filter_class_id=CLASS_ID,
                                num_aug=NUM_AUG, angle_max=angle_max, shift_max=shift_max,
                                save_output=False, relu_output=False, chunk_size=100)

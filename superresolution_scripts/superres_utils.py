@@ -119,3 +119,51 @@ def check_hdf5_validity(file, num_aug=100):
             return False
 
     return True
+
+
+def threshold_image(image, th_value, th_factor=.15, th_mask=None):
+    """
+    Perform the pixel-wise threshold of the given image.
+
+    Optionally if th_mask is given the input image is thresholded against the value in th_mask
+
+    Args:
+        image: The mask to be thresholded
+        th_value: Pixel value for the destination image
+        th_factor: Percentage of the image max value used as thresholding value
+        th_mask: Thresholding mask
+
+    Returns: The thresholded image that contains either 0 or value
+
+    """
+    if th_mask is not None:
+        th_image = tf.where(image >= th_mask, th_value, 0)
+    else:
+        max_value = tf.cast(tf.reduce_max(image), tf.float32) * th_factor
+        th_image = tf.where(image > max_value, th_value, 0)
+
+    return th_image.numpy()
+
+
+def single_class_IOU(y_true, y_pred, class_id):
+    y_true_squeeze = tf.squeeze(y_true)
+    y_pred_squeeze = tf.squeeze(y_pred)
+    classes = [0, class_id]  # Only check in background and given class
+
+    y_true_squeeze = tf.where(y_true_squeeze != class_id, 0, y_true_squeeze)
+
+    ious = []
+    for i in classes:
+        true_labels = tf.equal(y_true_squeeze, i)
+        pred_labels = tf.equal(y_pred_squeeze, i)
+        inter = tf.cast(true_labels & pred_labels, tf.int32)
+        union = tf.cast(true_labels | pred_labels, tf.int32)
+
+        iou = tf.reduce_sum(inter) / tf.reduce_sum(union)
+        ious.append(iou)
+
+    ious = tf.stack(ious)
+    legal_labels = ~tf.math.is_nan(ious)
+    ious = tf.gather(ious, indices=tf.where(legal_labels))
+    return tf.reduce_mean(ious)
+
