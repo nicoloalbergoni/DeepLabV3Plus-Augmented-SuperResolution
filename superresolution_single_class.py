@@ -130,8 +130,8 @@ def compare_results(superres_dict, image_size=(512, 512), verbose=False):
 
 def main():
     learning_rate = 1e-3
-    lambda_eng = 0.109
-    lambda_tv = 0.2294
+    lambda_eng = 0.1495
+    lambda_tv = 0.5343
     num_iter = 450
 
     superresolution = Superresolution(
@@ -148,7 +148,7 @@ def main():
 
     superres_masks_dict, losses = compute_superresolution_output(precomputed_data_paths, superresolution, mode=MODE,
                                                                  dest_folder=SUPERRES_OUTPUT_DIR, num_aug=NUM_AUG,
-                                                                 global_normalize=True, save_output=True)
+                                                                 global_normalize=True, save_output=False)
 
     superres_masks_dict_th = {}
 
@@ -159,6 +159,7 @@ def main():
         else:
             th_mask = threshold_image(target_dict["class"], CLASS_ID, th_factor=.15)
 
+        tf.keras.utils.save_img(f"{SUPERRES_OUTPUT_DIR}/{key}_th.png", th_mask, scale=True)
         superres_masks_dict_th[key] = th_mask
 
     standard_IOUs, superres_IOUs = compare_results(superres_masks_dict_th, image_size=IMG_SIZE, verbose=False)

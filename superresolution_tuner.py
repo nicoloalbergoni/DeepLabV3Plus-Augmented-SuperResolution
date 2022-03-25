@@ -10,7 +10,7 @@ from superresolution_scripts.superres_utils import min_max_normalization, list_p
     check_hdf5_validity, threshold_image, single_class_IOU
 import keras_tuner as kt
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+# os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 DATA_DIR = os.path.join(os.getcwd(), "data")
 PASCAL_ROOT = os.path.join(DATA_DIR, "dataset_root", "VOCdevkit", "VOC2012")
@@ -27,26 +27,29 @@ np.random.seed(SEED)
 tf.random.set_seed(SEED)
 
 IMG_SIZE = (512, 512)
-NUM_AUG = 100
+NUM_AUG = 50
 CLASS_ID = 8
-NUM_SAMPLES = 100
+NUM_SAMPLES = 50
 MODE = "slice"
 
 
-def evaluate_IOU(true_mask, superres_mask, img_size=(512, 512)):
+def evaluate_IOU(true_mask, standard_mask, superres_mask, class_id, img_size=(512, 512)):
     true_mask = tf.reshape(true_mask, (img_size[0] * img_size[1], 1))
+    standard_mask = tf.reshape(standard_mask, (img_size[0] * img_size[1], 1))
     superres_mask = tf.reshape(superres_mask, (img_size[0] * img_size[1], 1))
 
-    superres_IOU = single_class_IOU(true_mask, superres_mask, class_id=CLASS_ID)
+    standard_IOU = single_class_IOU(true_mask, standard_mask, class_id=class_id)
+    superres_IOU = single_class_IOU(true_mask, superres_mask, class_id=class_id)
 
-    return superres_IOU.numpy()
+    return standard_IOU.numpy(), superres_IOU.numpy()
 
 
 def compute_superresolution_output(precomputed_data_paths, superres_args, dest_folder, mode="slice", num_aug=100,
                                    global_normalize=True, save_output=False):
     class_losses = []
     max_losses = []
-    ious = []
+    standard_ious = []
+    superres_ious = []
 
     if not os.path.exists(dest_folder):
         os.makedirs(dest_folder)
@@ -106,24 +109,31 @@ def compute_superresolution_output(precomputed_data_paths, superres_args, dest_f
 
             max_losses.append(max_loss)
 
-        th_image = threshold_image(target_image_class, CLASS_ID, th_mask=None if mode == "argmax" else target_image_max,
-                                   th_factor=.15)
+        th_mask = threshold_image(target_image_class, CLASS_ID, th_mask=None if mode == "argmax" else target_image_max,
+                                  th_factor=.15)
 
         true_mask_path = os.path.join(PASCAL_ROOT, "SegmentationClassAug", f"{filename}.png")
+        standard_mask_path = os.path.join(STANDARD_OUTPUT_DIR, f"{filename}.png")
+
         true_mask = load_image(true_mask_path, image_size=IMG_SIZE, normalize=False,
                                is_png=True, resize_method="nearest")
+        standard_mask = load_image(standard_mask_path, image_size=IMG_SIZE, normalize=False, is_png=True,
+                                   resize_method="nearest")
 
-        iou = evaluate_IOU(true_mask, th_image)
-        ious.append(iou)
+        standard_iou, superres_iou = evaluate_IOU(true_mask, standard_mask, th_mask, class_id=CLASS_ID,
+                                                  img_size=IMG_SIZE)
+        standard_ious.append(standard_iou)
+        superres_ious.append(superres_iou)
 
         if save_output:
-            tf.keras.utils.save_img(f"{dest_folder}/{filename}_th_{mode}.png", th_image, scale=True)
+            tf.keras.utils.save_img(f"{dest_folder}/{filename}_th_{mode}.png", th_mask, scale=True)
 
-    mean_iou = np.mean(ious)
+    mean_standard_iou = np.mean(standard_ious)
+    mean_superres_iou = np.mean(superres_ious)
     mean_class_loss = np.mean(class_losses)
     mean_max_loss = np.mean(max_losses)
 
-    return mean_iou, mean_class_loss, mean_max_loss
+    return mean_standard_iou, mean_superres_iou, mean_class_loss, mean_max_loss
 
 
 class SuperresTuner(kt.RandomSearch):
@@ -151,7 +161,7 @@ class SuperresTuner(kt.RandomSearch):
         if not os.path.exists(wandb_dir):
             os.makedirs(wandb_dir)
 
-        run = wandb.init(project="Tuner Test 1", entity="albergoni-nicolo", dir=wandb_dir,
+        run = wandb.init(project="Tuner Test 3", entity="albergoni-nicolo", dir=wandb_dir,
                          config=hp.values)
 
         wandb.config.num_aug = NUM_AUG
@@ -160,20 +170,22 @@ class SuperresTuner(kt.RandomSearch):
         wandb.config.num_iter = superres_args["num_iter"]
         wandb.config.lr = superres_args["learning_rate"]
 
-        mean_iou, mean_class_loss, mean_max_loss = compute_superresolution_output(self.precomputed_data_paths,
-                                                                                  superres_args,
-                                                                                  dest_folder=SUPERRES_OUTPUT_DIR,
-                                                                                  mode=MODE, num_aug=NUM_AUG,
-                                                                                  global_normalize=global_normalize,
-                                                                                  save_output=False)
+        mean_standard_iou, mean_superres_iou, mean_class_loss, mean_max_loss = compute_superresolution_output(
+            self.precomputed_data_paths,
+            superres_args,
+            dest_folder=SUPERRES_OUTPUT_DIR,
+            mode=MODE, num_aug=NUM_AUG,
+            global_normalize=global_normalize,
+            save_output=False)
 
-        run.log({"mean_iou": mean_iou,
+        run.log({"mean_superres_iou": mean_superres_iou,
+                 "mean_standard_iou": mean_standard_iou,
                  "mean_class_loss": mean_class_loss,
                  "mean_max_loss": mean_max_loss})
 
         run.finish()
 
-        return 1.0 - mean_iou
+        return 1.0 - mean_superres_iou
 
 
 def main():
