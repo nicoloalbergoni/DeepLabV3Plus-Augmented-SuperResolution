@@ -1,5 +1,6 @@
 import os
 import h5py
+import wandb
 import numpy as np
 from tqdm import tqdm
 import tensorflow as tf
@@ -19,12 +20,15 @@ SUPERRES_OUTPUT_DIR = os.path.join(SUPERRES_ROOT, "superres_output")
 
 SEED = 1234
 
-tf.keras.utils.set_random_seed(SEED)
+np.random.seed(SEED)
+tf.random.set_seed(SEED)
+
+tf.config.run_functions_eagerly(True)
 
 IMG_SIZE = (512, 512)
-NUM_AUG = 50
+NUM_AUG = 100
 CLASS_ID = 8
-NUM_SAMPLES = 50
+NUM_SAMPLES = 100
 MODE = "slice"
 
 
@@ -129,19 +133,33 @@ def compare_results(superres_dict, image_size=(512, 512), verbose=False):
 
 
 def main():
-    learning_rate = 1e-3
-    lambda_eng = 0.1495
-    lambda_tv = 0.5343
-    num_iter = 450
+    superres_args = {
+        "lambda_tv": 0.5,
+        "lambda_eng": 0.02,
+        # "num_iter": hp.Int("num_iter", min_value=400, max_value=800, step=50),
+        "num_iter": 450,
+        "learning_rate": 1e-3,
+        "loss_coeff": False,
+        # "optimizer": hp.Choice("optimizer", ["adam", "adadelta", "adagrad"])
+        "optimizer": "adagrad",
+        "L1_reg": False,
+        "df_norm_coeff": 2.0
+    }
 
     superresolution = Superresolution(
-        lambda_tv=lambda_tv,
-        lambda_eng=lambda_eng,
-        num_iter=num_iter,
-        num_aug=NUM_AUG,
-        learning_rate=learning_rate,
+        **superres_args,
         verbose=False
     )
+
+    wandb_dir = os.path.join(DATA_DIR, "wandb_logs")
+    if not os.path.exists(wandb_dir):
+        os.makedirs(wandb_dir)
+
+    run = wandb.init(project="Single Evaluations", entity="albergoni-nicolo", dir=wandb_dir, name="Validation Test 1",
+                     config=superres_args)
+
+    wandb.config.num_aug = NUM_AUG
+    wandb.config.num_sample = NUM_SAMPLES
 
     path_list = list_precomputed_data_paths(PRECOMPUTED_OUTPUT_DIR)
     precomputed_data_paths = path_list if NUM_SAMPLES is None else path_list[:NUM_SAMPLES]
@@ -164,6 +182,11 @@ def main():
 
     standard_IOUs, superres_IOUs = compare_results(superres_masks_dict_th, image_size=IMG_SIZE, verbose=False)
     print(f"Standard mean IOU: {np.mean(standard_IOUs)},  Superres mean IOU: {np.mean(superres_IOUs)}")
+
+    run.log({"mean_superres_iou": np.mean(superres_IOUs),
+             "mean_standard_iou": np.mean(standard_IOUs)})
+
+    run.finish()
 
 
 if __name__ == '__main__':

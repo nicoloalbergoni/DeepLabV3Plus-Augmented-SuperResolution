@@ -10,7 +10,7 @@ from superresolution_scripts.superres_utils import min_max_normalization, list_p
     check_hdf5_validity, threshold_image, single_class_IOU
 import keras_tuner as kt
 
-# os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 DATA_DIR = os.path.join(os.getcwd(), "data")
 PASCAL_ROOT = os.path.join(DATA_DIR, "dataset_root", "VOCdevkit", "VOC2012")
@@ -27,9 +27,9 @@ np.random.seed(SEED)
 tf.random.set_seed(SEED)
 
 IMG_SIZE = (512, 512)
-NUM_AUG = 50
+NUM_AUG = 100
 CLASS_ID = 8
-NUM_SAMPLES = 50
+NUM_SAMPLES = 100
 MODE = "slice"
 
 
@@ -147,12 +147,17 @@ class SuperresTuner(kt.RandomSearch):
         hp = trial.hyperparameters
 
         superres_args = {
-            "lambda_tv": hp.Float("lambda_tv", min_value=0.002, max_value=1.0),
-            "lambda_eng": hp.Float("lambda_eng", min_value=0.001, max_value=1.0),
-            # "num_iter": hp.Int("num_iter", min_value=400, max_value=800, step=50),
+            "lambda_tv": 0.0,
+            "lambda_eng": hp.Float("lambda_eng", min_value=0.001, max_value=1.0, sampling="log"),
+            # "lambda_eng": 0.5,
+            # "num_iter": hp.Int("num_iter", min_value=450, max_value=1000, step=50),
             "num_iter": 450,
             "learning_rate": 1e-3,
-            "loss_coeff": False
+            "loss_coeff": True,
+            # "optimizer": hp.Choice("optimizer", ["adam", "adadelta", "adagrad"]),
+            "optimizer": "adagrad",
+            "L1_reg": False,
+            "df_norm_coeff": 2.0
         }
 
         global_normalize = True
@@ -161,14 +166,12 @@ class SuperresTuner(kt.RandomSearch):
         if not os.path.exists(wandb_dir):
             os.makedirs(wandb_dir)
 
-        run = wandb.init(project="Tuner Test 3", entity="albergoni-nicolo", dir=wandb_dir,
+        run = wandb.init(project="Eng no TV", entity="albergoni-nicolo", dir=wandb_dir,
                          config=hp.values)
 
         wandb.config.num_aug = NUM_AUG
         wandb.config.num_sample = NUM_SAMPLES
-        # wandb.config.class_id = CLASS_ID
-        wandb.config.num_iter = superres_args["num_iter"]
-        wandb.config.lr = superres_args["learning_rate"]
+        wandb.config.update(superres_args)
 
         mean_standard_iou, mean_superres_iou, mean_class_loss, mean_max_loss = compute_superresolution_output(
             self.precomputed_data_paths,

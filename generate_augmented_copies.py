@@ -22,9 +22,8 @@ np.random.seed(SEED)
 tf.random.set_seed(SEED)
 
 IMG_SIZE = (512, 512)
-BATCH_SIZE = 4
-CLASSES = 21
-NUM_AUG = 50
+BATCH_SIZE = 8
+NUM_AUG = 100
 CLASS_ID = 8
 NUM_SAMPLES = 1500
 MODE = "slice"
