@@ -8,14 +8,6 @@ import tensorflow_addons as tfa
 from utils import load_image, get_prediction, create_mask
 from superresolution_scripts.superres_utils import get_img_paths, filter_by_class
 
-DATA_DIR = os.path.join(os.getcwd(), "data")
-PASCAL_ROOT = os.path.join(DATA_DIR, "dataset_root", "VOCdevkit", "VOC2012")
-IMGS_PATH = os.path.join(PASCAL_ROOT, "JPEGImages")
-
-SUPERRES_ROOT = os.path.join(DATA_DIR, "superres_root")
-PRECOMPUTED_OUTPUT_DIR = os.path.join(SUPERRES_ROOT, "precomputed_features")
-STANDARD_OUTPUT_DIR = os.path.join(SUPERRES_ROOT, "standard_output")
-
 SEED = 1234
 
 np.random.seed(SEED)
@@ -27,6 +19,15 @@ NUM_AUG = 100
 CLASS_ID = 8
 NUM_SAMPLES = 1500
 MODE = "slice"
+USE_VALIDATION = False
+
+DATA_DIR = os.path.join(os.getcwd(), "data")
+PASCAL_ROOT = os.path.join(DATA_DIR, "dataset_root", "VOCdevkit", "VOC2012")
+IMGS_PATH = os.path.join(PASCAL_ROOT, "JPEGImages")
+
+SUPERRES_ROOT = os.path.join(DATA_DIR, "superres_root")
+PRECOMPUTED_OUTPUT_DIR = os.path.join(SUPERRES_ROOT, f"precomputed_features{'_validation' if USE_VALIDATION else ''}")
+STANDARD_OUTPUT_DIR = os.path.join(SUPERRES_ROOT, f"standard_output{'_validation' if USE_VALIDATION else ''}")
 
 
 def compute_standard_output(image_dict, model, dest_folder, filter_class_id=None):
@@ -166,7 +167,7 @@ def compute_augmented_features(image_filenames, model, dest_folder, filter_class
 
 
 def main():
-    image_list_path = os.path.join(DATA_DIR, "augmented_file_lists", "trainaug.txt")
+    image_list_path = os.path.join(DATA_DIR, "augmented_file_lists", f"{'valaug' if USE_VALIDATION else 'trainaug'}.txt")
     image_paths = get_img_paths(image_list_path, IMGS_PATH)
 
     if NUM_SAMPLES is not None:

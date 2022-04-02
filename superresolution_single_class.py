@@ -9,14 +9,6 @@ from utils import load_image
 from superresolution_scripts.superres_utils import min_max_normalization, \
     list_precomputed_data_paths, check_hdf5_validity, threshold_image, single_class_IOU
 
-DATA_DIR = os.path.join(os.getcwd(), "data")
-PASCAL_ROOT = os.path.join(DATA_DIR, "dataset_root", "VOCdevkit", "VOC2012")
-IMGS_PATH = os.path.join(PASCAL_ROOT, "JPEGImages")
-
-SUPERRES_ROOT = os.path.join(DATA_DIR, "superres_root")
-PRECOMPUTED_OUTPUT_DIR = os.path.join(SUPERRES_ROOT, "precomputed_features")
-STANDARD_OUTPUT_DIR = os.path.join(SUPERRES_ROOT, "standard_output")
-SUPERRES_OUTPUT_DIR = os.path.join(SUPERRES_ROOT, "superres_output")
 
 SEED = 1234
 
@@ -30,6 +22,16 @@ NUM_AUG = 100
 CLASS_ID = 8
 NUM_SAMPLES = 100
 MODE = "slice"
+USE_VALIDATION = False
+
+DATA_DIR = os.path.join(os.getcwd(), "data")
+PASCAL_ROOT = os.path.join(DATA_DIR, "dataset_root", "VOCdevkit", "VOC2012")
+IMGS_PATH = os.path.join(PASCAL_ROOT, "JPEGImages")
+
+SUPERRES_ROOT = os.path.join(DATA_DIR, "superres_root")
+PRECOMPUTED_OUTPUT_DIR = os.path.join(SUPERRES_ROOT, f"precomputed_features{'_validation' if USE_VALIDATION else ''}")
+STANDARD_OUTPUT_DIR = os.path.join(SUPERRES_ROOT, f"standard_output{'_validation' if USE_VALIDATION else ''}")
+SUPERRES_OUTPUT_DIR = os.path.join(SUPERRES_ROOT, f"superres_output{'_validation' if USE_VALIDATION else ''}")
 
 
 def compute_superresolution_output(precomputed_data_paths, superresolution_obj, dest_folder, mode="slice", num_aug=100,
