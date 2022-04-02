@@ -3,8 +3,9 @@ import tensorflow_addons as tfa
 
 
 class Superresolution:
-    def __init__(self, lambda_tv, lambda_eng, num_iter=200, learning_rate=1e-3,
-                 feature_size=(64, 64), output_size=(512, 512), num_aug=100, verbose=False, loss_coeff=False):
+    def __init__(self, lambda_tv, lambda_eng, num_iter=200, learning_rate=1e-3, optimizer="adam", L1_reg=False,
+                 feature_size=(64, 64), output_size=(512, 512), num_aug=100, verbose=False, loss_coeff=False,
+                 df_norm_coeff=2.0):
         self.num_iter = num_iter
         self.lambda_eng = lambda_eng
         self.lambda_tv = lambda_tv
@@ -14,6 +15,9 @@ class Superresolution:
         self.learning_rate = learning_rate
         self.verbose = verbose
         self.loss_coeff = loss_coeff
+        self.optimizer = optimizer
+        self.L1_reg = L1_reg
+        self.df_norm_coeff = df_norm_coeff
 
     @tf.function
     def loss_function(self, target_image, augmented_samples, angles, shifts):
@@ -28,9 +32,16 @@ class Superresolution:
         target_gradients = tf.image.image_gradients(target_image)
 
         # Loss terms
-        df = tf.reduce_sum(tf.math.squared_difference(D_operator, augmented_samples), name="data_fidelity")
+        # df = tf.reduce_sum(tf.math.squared_difference(D_operator, augmented_samples), name="data_fidelity")
+
+        df = tf.reduce_sum(tf.math.square(tf.norm(tf.subtract(D_operator, augmented_samples), ord=self.df_norm_coeff)))
+
         tv = tf.reduce_sum(tf.add(tf.abs(target_gradients[0]), tf.abs(target_gradients[1])))
-        norm = tf.reduce_sum(tf.square(target_image))
+
+        if self.L1_reg:
+            norm = tf.reduce_sum(tf.abs(target_image))
+        else:
+            norm = tf.reduce_sum(tf.square(target_image))
 
         tv_lambda = tf.scalar_mul(self.lambda_tv, tv)
         norm_mu = tf.scalar_mul(self.lambda_eng, norm)
@@ -40,14 +51,18 @@ class Superresolution:
         loss = tf.add(partial_loss, norm_mu)
 
         if self.loss_coeff:
-            #TODO: WIP
             loss = tf.scalar_mul(0.5, loss)
 
         return loss
 
     def compute_output(self, augmented_samples, angles, shifts):
 
-        optimizer = tf.optimizers.Adam(learning_rate=self.learning_rate)
+        if self.optimizer == "adadelta":
+            optimizer = tf.optimizers.Adadelta(learning_rate=self.learning_rate)
+        elif self.optimizer == "adagrad":
+            optimizer = tf.optimizers.Adagrad(learning_rate=self.learning_rate)
+        else:
+            optimizer = tf.optimizers.Adam(learning_rate=self.learning_rate)
 
         # Variable for the target output image
         target_image = tf.Variable(tf.zeros([1, self.output_size[0], self.output_size[1], 1]), name="Target_Image")
