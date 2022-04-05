@@ -136,6 +136,7 @@ def compare_results(superres_dict, image_size=(512, 512), verbose=False):
 
 def main():
     superres_args = {
+        "lambda_df": 1.0,
         "lambda_tv": 0.5,
         "lambda_eng": 0.02,
         # "num_iter": hp.Int("num_iter", min_value=400, max_value=800, step=50),
@@ -143,9 +144,9 @@ def main():
         "learning_rate": 1e-3,
         "loss_coeff": False,
         # "optimizer": hp.Choice("optimizer", ["adam", "adadelta", "adagrad"])
-        "optimizer": "adagrad",
+        "optimizer": "adam",
         "L1_reg": False,
-        "df_norm_coeff": 2.0
+        "df_lp_norm": 2.0
     }
 
     superresolution = Superresolution(
@@ -157,18 +158,18 @@ def main():
     if not os.path.exists(wandb_dir):
         os.makedirs(wandb_dir)
 
-    run = wandb.init(project="Single Evaluations", entity="albergoni-nicolo", dir=wandb_dir, name="Validation Test 1",
+    run = wandb.init(project="Single Evaluations", entity="albergoni-nicolo", dir=wandb_dir, name="Test",
                      config=superres_args)
 
     wandb.config.num_aug = NUM_AUG
     wandb.config.num_sample = NUM_SAMPLES
 
-    path_list = list_precomputed_data_paths(PRECOMPUTED_OUTPUT_DIR)
+    path_list = list_precomputed_data_paths(PRECOMPUTED_OUTPUT_DIR, sort=True)
     precomputed_data_paths = path_list if NUM_SAMPLES is None else path_list[:NUM_SAMPLES]
 
     superres_masks_dict, losses = compute_superresolution_output(precomputed_data_paths, superresolution, mode=MODE,
                                                                  dest_folder=SUPERRES_OUTPUT_DIR, num_aug=NUM_AUG,
-                                                                 global_normalize=True, save_output=False)
+                                                                 global_normalize=True, save_output=True)
 
     superres_masks_dict_th = {}
 

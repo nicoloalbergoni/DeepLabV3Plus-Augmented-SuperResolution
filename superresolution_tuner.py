@@ -148,7 +148,8 @@ class SuperresTuner(kt.RandomSearch):
         hp = trial.hyperparameters
 
         superres_args = {
-            "lambda_tv": 0.0,
+            "lambda_df": hp.Float("lambda_df", min_value=0.001, max_value=1.0, sampling="log"),
+            "lambda_tv": hp.Float("lambda_tv", min_value=0.001, max_value=1.0, sampling="log"),
             "lambda_eng": hp.Float("lambda_eng", min_value=0.001, max_value=1.0, sampling="log"),
             # "lambda_eng": 0.5,
             # "num_iter": hp.Int("num_iter", min_value=450, max_value=1000, step=50),
@@ -156,9 +157,9 @@ class SuperresTuner(kt.RandomSearch):
             "learning_rate": 1e-3,
             "loss_coeff": True,
             # "optimizer": hp.Choice("optimizer", ["adam", "adadelta", "adagrad"]),
-            "optimizer": "adagrad",
+            "optimizer": "adam",
             "L1_reg": False,
-            "df_norm_coeff": 2.0
+            "df_lp_norm": 2.0
         }
 
         global_normalize = True
@@ -167,7 +168,7 @@ class SuperresTuner(kt.RandomSearch):
         if not os.path.exists(wandb_dir):
             os.makedirs(wandb_dir)
 
-        run = wandb.init(project="Eng no TV", entity="albergoni-nicolo", dir=wandb_dir,
+        run = wandb.init(project="Added DF coefficient", entity="albergoni-nicolo", dir=wandb_dir,
                          config=hp.values)
 
         wandb.config.num_aug = NUM_AUG

@@ -5,7 +5,7 @@ from matplotlib import pyplot as plt
 from utils import load_image
 
 
-def get_img_paths(image_list_path, image_folder, is_png=False):
+def get_img_paths(image_list_path, image_folder, is_png=False, sort=True):
     """
     Given a file containing image identifiers returns the complete path to the image in the specified folder
 
@@ -13,35 +13,50 @@ def get_img_paths(image_list_path, image_folder, is_png=False):
         image_list_path: Path to the file containing the image-names list
         image_folder: Path to the folder containing the images
         is_png: Type of the images (jpg or png)
+        sort: If True sort the path list in alphabetical order (based on the basepath)
 
     Returns: List of full paths to the images
     """
     ext = ".jpg" if not is_png else ".png"
-    return [os.path.join(image_folder, line.rstrip() + ext) for line in open(image_list_path)]
+    paths = [os.path.join(image_folder, line.rstrip() + ext) for line in open(image_list_path)]
+
+    if sort:
+        paths = sorted(paths, key=lambda p: int(os.path.basename(p).split('.')[0]))
+
+    return paths
 
 
-def filter_by_class(img_paths, class_id, image_size=(512, 512)):
-    """
-    Given a list of image paths, return the images that contain the given class id in the respective mask
+def filter_image(image_path, class_id, image_size=(512, 512)):
 
-    Args:
-        img_paths: List of image paths to check
-        class_id: Class id used for filering
-        image_size: Size of the image used to load and resize the image
+    mask_path = image_path.replace("JPEGImages", "SegmentationClassAug").replace("jpg", "png")
+    mask = load_image(mask_path, image_size=image_size, normalize=False, is_png=True, resize_method="nearest")
+    if np.any(mask == class_id):
+        image = load_image(image_path, image_size=image_size, normalize=True)
+        return image
+    else:
+        return None
 
-    Returns: A dictionary whose keys are the image filename and values are the actual images
 
-    """
-    images_dict = {}
-    for img_path in img_paths:
-        image_name = os.path.splitext(os.path.basename(img_path))[0]
-        mask_path = img_path.replace("JPEGImages", "SegmentationClassAug").replace("jpg", "png")
-        mask = load_image(mask_path, image_size=image_size, normalize=False, is_png=True, resize_method="nearest")
-        if np.any(mask == class_id):
-            image = load_image(img_path, image_size=image_size, normalize=True)
-            images_dict[image_name] = image
+def load_images(path_list, num_images=None, filter_class_id=None, image_size=(512, 512)):
 
-    return images_dict
+    image_dict = {}
+
+    max_images = num_images if num_images is not None else len(path_list)
+
+    for path in path_list:
+        if len(image_dict) == max_images:
+            break
+
+        image_name = os.path.splitext(os.path.basename(path))[0]
+
+        if filter_class_id is not None:
+            image = filter_image(path, class_id=filter_class_id, image_size=image_size)
+            if image is not None:
+                image_dict[image_name] = image
+        else:
+            image_dict[image_name] = load_image(path, image_size=image_size, normalize=True)
+
+    return image_dict
 
 
 def min_max_normalization(image, new_min=0.0, new_max=255.0, global_min=None, global_max=None):
@@ -53,7 +68,7 @@ def min_max_normalization(image, new_min=0.0, new_max=255.0, global_min=None, gl
     return new_min + (num / den)
 
 
-def load_images(img_folder):
+def load_precomputed_images(img_folder):
     images = []
     # Sort images based on their filename which is an integer indicating the augmented copy number
     image_list = sorted([name.replace(".png", "") for name in os.listdir(img_folder) if ".npy" not in name], key=int)
@@ -100,13 +115,16 @@ def print_labels(masks):
         print(title[i] + str(dict(zip(values, count))))
 
 
-def list_precomputed_data_paths(root_dir):
+def list_precomputed_data_paths(root_dir, sort=False):
     paths = []
 
     for path, subdirs, files in os.walk(root_dir):
         for filename in files:
             if filename.endswith(".hdf5"):
                 paths.append(os.path.join(path, filename))
+
+    if sort:
+        paths = sorted(paths, key=lambda p: int(os.path.basename(p).split('.')[0]))
 
     return paths
 

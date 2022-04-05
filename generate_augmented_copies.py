@@ -6,7 +6,7 @@ import tensorflow as tf
 from model import DeeplabV3Plus
 import tensorflow_addons as tfa
 from utils import load_image, get_prediction, create_mask
-from superresolution_scripts.superres_utils import get_img_paths, filter_by_class
+from superresolution_scripts.superres_utils import get_img_paths, load_images
 
 SEED = 1234
 
@@ -17,7 +17,7 @@ IMG_SIZE = (512, 512)
 BATCH_SIZE = 8
 NUM_AUG = 100
 CLASS_ID = 8
-NUM_SAMPLES = 1500
+NUM_SAMPLES = None
 MODE = "slice"
 USE_VALIDATION = False
 
@@ -47,7 +47,6 @@ def compute_standard_output(image_dict, model, dest_folder, filter_class_id=None
 
 
 def create_augmented_copies(image, num_aug, angle_max, shift_max):
-
     batched_images = tf.tile(tf.expand_dims(image, axis=0), [num_aug, 1, 1, 1])  # Size [num_aug, 512, 512, 3]
     angles = np.random.uniform(-angle_max, angle_max, num_aug)
     shifts = np.random.uniform(-shift_max, shift_max, (num_aug, 2))
@@ -63,37 +62,37 @@ def create_augmented_copies(image, num_aug, angle_max, shift_max):
     return translated_images, angles, shifts
 
 
-# def create_augmented_copies(image, num_aug, angle_max, shift_max, chunk_size=100):
-#     if (num_aug % chunk_size) != 0:
-#         raise Exception("Num aug must be a multiple of 50")
-#
-#     num_chunks = num_aug // chunk_size
-#
-#     angles = np.random.uniform(-angle_max, angle_max, num_aug)
-#     shifts = np.random.uniform(-shift_max, shift_max, (num_aug, 2))
-#     angles[0] = 0
-#     shifts[0] = np.array([0, 0])
-#     angles = angles.astype("float32")
-#     shifts = shifts.astype("float32")
-#
-#     angles_chunks = np.split(angles, num_chunks)
-#     shifts_chunks = np.split(shifts, num_chunks)
-#
-#     augmented_chunks = []
-#
-#     for i in range(num_chunks):
-#         images_chunk = tf.tile(tf.expand_dims(image, axis=0), [chunk_size, 1, 1, 1])
-#         rotated_chunk = tfa.image.rotate(images_chunk, angles_chunks[i], interpolation="bilinear")
-#         translated_chunk = tfa.image.translate(rotated_chunk, shifts_chunks[i], interpolation="bilinear")
-#         augmented_chunks.append(translated_chunk.numpy())
-#
-#     augmented_copies = np.concatenate(augmented_chunks, axis=0)
-#
-#     return augmented_copies, angles, shifts
+def create_augmented_copies_chunked(image, num_aug, angle_max, shift_max, chunk_size=100):
+    if (num_aug % chunk_size) != 0:
+        raise Exception("Num aug must be a multiple of 50")
+
+    num_chunks = num_aug // chunk_size
+
+    angles = np.random.uniform(-angle_max, angle_max, num_aug)
+    shifts = np.random.uniform(-shift_max, shift_max, (num_aug, 2))
+    angles[0] = 0
+    shifts[0] = np.array([0, 0])
+    angles = angles.astype("float32")
+    shifts = shifts.astype("float32")
+
+    angles_chunks = np.split(angles, num_chunks)
+    shifts_chunks = np.split(shifts, num_chunks)
+
+    augmented_chunks = []
+
+    for i in range(num_chunks):
+        images_chunk = tf.tile(tf.expand_dims(image, axis=0), [chunk_size, 1, 1, 1])
+        rotated_chunk = tfa.image.rotate(images_chunk, angles_chunks[i], interpolation="bilinear")
+        translated_chunk = tfa.image.translate(rotated_chunk, shifts_chunks[i], interpolation="bilinear")
+        augmented_chunks.append(translated_chunk.numpy())
+
+    augmented_copies = np.concatenate(augmented_chunks, axis=0)
+
+    return augmented_copies, angles, shifts
 
 
 def compute_augmented_features(image_filenames, model, dest_folder, filter_class_id, mode="slice", num_aug=100,
-                               angle_max=0.5, shift_max=30, save_output=False, relu_output=False, chunk_size=50):
+                               angle_max=0.5, shift_max=30, save_output=False, relu_output=False):
     augmented_features = {}
 
     for filename in tqdm(image_filenames):
@@ -101,7 +100,6 @@ def compute_augmented_features(image_filenames, model, dest_folder, filter_class
         # Load image
         image_path = os.path.join(IMGS_PATH, f"{filename}.jpg")
         image = load_image(image_path, image_size=IMG_SIZE, normalize=True)
-
 
         # Create augmented copies
         augmented_copies, angles, shifts = create_augmented_copies(image, num_aug=num_aug, angle_max=angle_max,
@@ -167,13 +165,10 @@ def compute_augmented_features(image_filenames, model, dest_folder, filter_class
 
 
 def main():
-    image_list_path = os.path.join(DATA_DIR, "augmented_file_lists", f"{'valaug' if USE_VALIDATION else 'trainaug'}.txt")
-    image_paths = get_img_paths(image_list_path, IMGS_PATH)
-
-    if NUM_SAMPLES is not None:
-        image_paths = image_paths[:NUM_SAMPLES]
-
-    images_dict = filter_by_class(image_paths, class_id=CLASS_ID)
+    image_list_path = os.path.join(DATA_DIR, "augmented_file_lists",
+                                   f"{'valaug' if USE_VALIDATION else 'trainaug'}.txt")
+    image_paths = get_img_paths(image_list_path, IMGS_PATH, is_png=False, sort=True)
+    images_dict = load_images(image_paths, num_images=NUM_SAMPLES, filter_class_id=CLASS_ID, image_size=IMG_SIZE)
 
     print(f"Valid images: {len(images_dict)} (Initial:  {len(image_paths)})")
 
@@ -207,7 +202,7 @@ def main():
     compute_augmented_features(images_dict, model_no_upsample, mode=MODE,
                                dest_folder=PRECOMPUTED_OUTPUT_DIR, filter_class_id=CLASS_ID,
                                num_aug=NUM_AUG, angle_max=angle_max, shift_max=shift_max,
-                               save_output=False, relu_output=False, chunk_size=100)
+                               save_output=False, relu_output=False)
 
 
 if __name__ == '__main__':

@@ -3,10 +3,12 @@ import tensorflow_addons as tfa
 
 
 class Superresolution:
-    def __init__(self, lambda_tv, lambda_eng, num_iter=200, learning_rate=1e-3, optimizer="adam", L1_reg=False,
+    def __init__(self, lambda_df, lambda_tv, lambda_eng, num_iter=200, learning_rate=1e-3, optimizer="adam", L1_reg=False,
                  feature_size=(64, 64), output_size=(512, 512), num_aug=100, verbose=False, loss_coeff=False,
-                 df_norm_coeff=2.0):
+                 df_lp_norm=2.0):
+
         self.num_iter = num_iter
+        self.lambda_df = lambda_df
         self.lambda_eng = lambda_eng
         self.lambda_tv = lambda_tv
         self.num_aug = num_aug
@@ -17,7 +19,7 @@ class Superresolution:
         self.loss_coeff = loss_coeff
         self.optimizer = optimizer
         self.L1_reg = L1_reg
-        self.df_norm_coeff = df_norm_coeff
+        self.df_lp_norm = df_lp_norm
 
     @tf.function
     def loss_function(self, target_image, augmented_samples, angles, shifts):
@@ -34,7 +36,7 @@ class Superresolution:
         # Loss terms
         # df = tf.reduce_sum(tf.math.squared_difference(D_operator, augmented_samples), name="data_fidelity")
 
-        df = tf.reduce_sum(tf.math.square(tf.norm(tf.subtract(D_operator, augmented_samples), ord=self.df_norm_coeff)))
+        df = tf.reduce_sum(tf.math.square(tf.norm(tf.subtract(D_operator, augmented_samples), ord=self.df_lp_norm)))
 
         tv = tf.reduce_sum(tf.add(tf.abs(target_gradients[0]), tf.abs(target_gradients[1])))
 
@@ -43,12 +45,13 @@ class Superresolution:
         else:
             norm = tf.reduce_sum(tf.square(target_image))
 
+        df_lambda = tf.scalar_mul(self.lambda_df, df)
         tv_lambda = tf.scalar_mul(self.lambda_tv, tv)
-        norm_mu = tf.scalar_mul(self.lambda_eng, norm)
+        norm_lambda = tf.scalar_mul(self.lambda_eng, norm)
 
         # Loss definition
-        partial_loss = tf.add(df, tv_lambda)
-        loss = tf.add(partial_loss, norm_mu)
+        partial_loss = tf.add(df_lambda, tv_lambda)
+        loss = tf.add(partial_loss, norm_lambda)
 
         if self.loss_coeff:
             loss = tf.scalar_mul(0.5, loss)
