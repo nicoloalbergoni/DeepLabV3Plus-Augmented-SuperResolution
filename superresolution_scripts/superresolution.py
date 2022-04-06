@@ -1,25 +1,30 @@
+import numpy as np
 import tensorflow as tf
 import tensorflow_addons as tfa
 
 
 class Superresolution:
-    def __init__(self, lambda_df, lambda_tv, lambda_eng, num_iter=200, learning_rate=1e-3, optimizer="adam", L1_reg=False,
-                 feature_size=(64, 64), output_size=(512, 512), num_aug=100, verbose=False, loss_coeff=False,
-                 df_lp_norm=2.0):
+    def __init__(self, lambda_df, lambda_tv, lambda_eng, lambda_L1=0.0, num_iter=200, learning_rate=1e-3,
+                 optimizer="adam", feature_size=(64, 64), output_size=(512, 512), num_aug=100,
+                 verbose=False, df_lp_norm=2.0):
 
+        self.lambda_df, self.lambda_tv, self.lambda_eng, self.lambda_L1 = Superresolution.__normalize_coefficients(
+            lambda_df, lambda_tv,
+            lambda_eng, lambda_L1)
         self.num_iter = num_iter
-        self.lambda_df = lambda_df
-        self.lambda_eng = lambda_eng
-        self.lambda_tv = lambda_tv
         self.num_aug = num_aug
         self.output_size = output_size
         self.feature_size = feature_size
         self.learning_rate = learning_rate
         self.verbose = verbose
-        self.loss_coeff = loss_coeff
         self.optimizer = optimizer
-        self.L1_reg = L1_reg
         self.df_lp_norm = df_lp_norm
+
+    @staticmethod
+    def __normalize_coefficients(lambda_df, lambda_tv, lambda_eng, lambda_L1):
+        coeff_list = [lambda_df, lambda_tv, lambda_eng, lambda_L1]
+        normalized_coeff = np.array(coeff_list / np.sum(coeff_list))
+        return tuple(normalized_coeff)
 
     @tf.function
     def loss_function(self, target_image, augmented_samples, angles, shifts):
@@ -39,11 +44,7 @@ class Superresolution:
         df = tf.reduce_sum(tf.math.square(tf.norm(tf.subtract(D_operator, augmented_samples), ord=self.df_lp_norm)))
 
         tv = tf.reduce_sum(tf.add(tf.abs(target_gradients[0]), tf.abs(target_gradients[1])))
-
-        if self.L1_reg:
-            norm = tf.reduce_sum(tf.abs(target_image))
-        else:
-            norm = tf.reduce_sum(tf.square(target_image))
+        norm = tf.reduce_sum(tf.square(target_image))
 
         df_lambda = tf.scalar_mul(self.lambda_df, df)
         tv_lambda = tf.scalar_mul(self.lambda_tv, tv)
@@ -53,8 +54,10 @@ class Superresolution:
         partial_loss = tf.add(df_lambda, tv_lambda)
         loss = tf.add(partial_loss, norm_lambda)
 
-        if self.loss_coeff:
-            loss = tf.scalar_mul(0.5, loss)
+        if self.lambda_L1 > 0.0:
+            L1_term = tf.reduce_sum(tf.abs(target_image))
+            L1_lambda = tf.scalar_mul(self.lambda_L1, L1_term)
+            loss = tf.add(loss, L1_lambda)
 
         return loss
 

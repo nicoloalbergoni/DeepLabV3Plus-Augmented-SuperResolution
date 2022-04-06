@@ -135,17 +135,17 @@ def compare_results(superres_dict, image_size=(512, 512), verbose=False):
 
 
 def main():
+
     superres_args = {
-        "lambda_df": 1.0,
-        "lambda_tv": 0.5,
-        "lambda_eng": 0.02,
+        "lambda_df": 0.7771,
+        "lambda_tv": 0.5737,
+        "lambda_eng": 1.228,
+        "lambda_L1": 0.0,
         # "num_iter": hp.Int("num_iter", min_value=400, max_value=800, step=50),
         "num_iter": 450,
         "learning_rate": 1e-3,
-        "loss_coeff": False,
         # "optimizer": hp.Choice("optimizer", ["adam", "adadelta", "adagrad"])
         "optimizer": "adam",
-        "L1_reg": False,
         "df_lp_norm": 2.0
     }
 
@@ -158,7 +158,7 @@ def main():
     if not os.path.exists(wandb_dir):
         os.makedirs(wandb_dir)
 
-    run = wandb.init(project="Single Evaluations", entity="albergoni-nicolo", dir=wandb_dir, name="Test",
+    run = wandb.init(project="Single Evaluations", entity="albergoni-nicolo", dir=wandb_dir, name="Class Refactor 1",
                      config=superres_args)
 
     wandb.config.num_aug = NUM_AUG
@@ -169,7 +169,7 @@ def main():
 
     superres_masks_dict, losses = compute_superresolution_output(precomputed_data_paths, superresolution, mode=MODE,
                                                                  dest_folder=SUPERRES_OUTPUT_DIR, num_aug=NUM_AUG,
-                                                                 global_normalize=True, save_output=True)
+                                                                 global_normalize=True, save_output=False)
 
     superres_masks_dict_th = {}
 
