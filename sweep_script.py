@@ -9,7 +9,7 @@ from utils import load_image
 from superresolution_scripts.superres_utils import min_max_normalization, \
     list_precomputed_data_paths, check_hdf5_validity, threshold_image, single_class_IOU
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 SEED = 1234
 
@@ -139,7 +139,7 @@ def main():
     hyperparamters_default = {
         "lambda_df": 0.001,
         "lambda_tv": 0.001,
-        "lambda_eng": 0.001,
+        "lambda_L2": 0.001,
         "lambda_L1": 0.001,
         "num_iter": 450,
         "learning_rate": 1e-3,
@@ -158,9 +158,11 @@ def main():
 
     config = wandb.config
 
-    superresolution = Superresolution(lambda_df=config.lambda_df,lambda_tv=config.lambda_tv, lambda_eng=config.lambda_eng, lambda_L1=config.lambda_L1,  num_iter=config.num_iter,
+    superresolution = Superresolution(lambda_df=config.lambda_df, lambda_tv=config.lambda_tv,
+                                      lambda_L2=config.lambda_L2, lambda_L1=config.lambda_L1, num_iter=config.num_iter,
                                       learning_rate=config.learning_rate, optimizer=config.optimizer,
-                                      num_aug=config.num_aug, lr_scheduler=config.lr_scheduler, verbose=False)
+                                      num_aug=config.num_aug, df_lp_norm=config.df_lp_norm,
+                                      lr_scheduler=config.lr_scheduler, verbose=False)
 
     path_list = list_precomputed_data_paths(PRECOMPUTED_OUTPUT_DIR, sort=True)
     precomputed_data_paths = path_list if config.num_samples is None else path_list[:config.num_samples]

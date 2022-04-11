@@ -6,7 +6,7 @@ metric:
   goal: maximize
   name: mean_superres_iou
 parameters:
-  lambda_eng:
+  lambda_df:
     max: 5
     min: 0.01
     distribution: uniform
@@ -14,7 +14,7 @@ parameters:
     max: 5
     min: 0.01
     distribution: uniform
-  lambda_df:
+  lambda_L2:
     max: 5
     min: 0.01
     distribution: uniform

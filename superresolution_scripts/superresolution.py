@@ -4,13 +4,13 @@ import tensorflow_addons as tfa
 
 
 class Superresolution:
-    def __init__(self, lambda_df, lambda_tv, lambda_eng, lambda_L1=0.0, num_iter=200, learning_rate=1e-3,
+    def __init__(self, lambda_df, lambda_tv, lambda_L2, lambda_L1=0.0, num_iter=200, learning_rate=1e-3,
                  optimizer="adam", feature_size=(64, 64), output_size=(512, 512), num_aug=100,
                  verbose=False, df_lp_norm=2.0, lr_scheduler=False):
 
-        self.lambda_df, self.lambda_tv, self.lambda_eng, self.lambda_L1 = Superresolution.__normalize_coefficients(
+        self.lambda_df, self.lambda_tv, self.lambda_L2, self.lambda_L1 = Superresolution.__normalize_coefficients(
             lambda_df, lambda_tv,
-            lambda_eng, lambda_L1)
+            lambda_L2, lambda_L1)
         self.num_iter = num_iter
         self.num_aug = num_aug
         self.output_size = output_size
@@ -22,8 +22,8 @@ class Superresolution:
         self.lr_scheduler = lr_scheduler
 
     @staticmethod
-    def __normalize_coefficients(lambda_df, lambda_tv, lambda_eng, lambda_L1):
-        coeff_list = [lambda_df, lambda_tv, lambda_eng, lambda_L1]
+    def __normalize_coefficients(lambda_df, lambda_tv, lambda_L2, lambda_L1):
+        coeff_list = [lambda_df, lambda_tv, lambda_L2, lambda_L1]
         normalized_coeff = np.array(coeff_list / np.sum(coeff_list))
         return tuple(normalized_coeff)
 
@@ -45,15 +45,15 @@ class Superresolution:
         df = tf.reduce_sum(tf.math.square(tf.norm(tf.subtract(D_operator, augmented_samples), ord=self.df_lp_norm)))
 
         tv = tf.reduce_sum(tf.add(tf.abs(target_gradients[0]), tf.abs(target_gradients[1])))
-        norm = tf.reduce_sum(tf.square(target_image))
+        L2_norm = tf.reduce_sum(tf.square(target_image))
 
         df_lambda = tf.scalar_mul(self.lambda_df, df)
         tv_lambda = tf.scalar_mul(self.lambda_tv, tv)
-        norm_lambda = tf.scalar_mul(self.lambda_eng, norm)
+        L2_lambda = tf.scalar_mul(self.lambda_L2, L2_norm)
 
         # Loss definition
         partial_loss = tf.add(df_lambda, tv_lambda)
-        loss = tf.add(partial_loss, norm_lambda)
+        loss = tf.add(partial_loss, L2_lambda)
 
         if self.lambda_L1 > 0.0:
             L1_term = tf.reduce_sum(tf.abs(target_image))

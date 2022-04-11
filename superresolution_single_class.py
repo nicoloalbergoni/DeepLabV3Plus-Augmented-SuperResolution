@@ -140,7 +140,7 @@ def main():
     superres_args = {
         "lambda_df": 1,
         "lambda_tv": 0.5,
-        "lambda_eng": 0.5,
+        "lambda_L2": 0.5,
         "lambda_L1": 0.0,
         # "num_iter": hp.Int("num_iter", min_value=400, max_value=800, step=50),
         "num_iter": 1000,
