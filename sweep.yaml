@@ -1,30 +1,32 @@
 entity: albergoni-nicolo
-project: Sweep test 2 (L1 Term)
+project: Sweep test 7 (Adam + LR decay)
 program: sweep_script.py
-method: random
+method: bayes
 metric:
   goal: maximize
   name: mean_superres_iou
 parameters:
   lambda_eng:
-    max: 2.0
-    min: 0.001
+    max: 5
+    min: 0.01
     distribution: uniform
   lambda_tv:
-    max: 2.0
-    min: 0.001
+    max: 5
+    min: 0.01
     distribution: uniform
   lambda_df:
-    max: 2.0
-    min: 0.001
+    max: 5
+    min: 0.01
     distribution: uniform
   lambda_L1:
-    max: 2.0
-    min: 0.001
+    max: 5
+    min: 0.01
     distribution: uniform
+  num_iter:
+    value: 1000
   num_samples:
     value: 100
-  num_aug:
-    value: 100
-  df_lp_norm:
-    value: 2
+  optimizer:
+    value: adam
+  lr_scheduler:
+    value: True

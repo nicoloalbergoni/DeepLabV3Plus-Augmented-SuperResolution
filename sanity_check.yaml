@@ -1,0 +1,36 @@
+entity: albergoni-nicolo
+project: Sanity check (Grid + Scheduler)
+program: sweep_script.py
+method: grid
+metric:
+  goal: maximize
+  name: mean_superres_iou
+parameters:
+  lambda_eng:
+    max: 10.0
+    min: 0.00
+    q: 0.5
+    distribution: q_uniform
+  lambda_tv:
+    max: 10.0
+    min: 0.0
+    q: 0.05
+    distribution: q_uniform
+  lambda_df:
+    max: 10.0
+    min: 0.0
+    q: 0.05
+    distribution: q_uniform
+  lambda_L1:
+    value: 0.0
+  num_iter:
+    value: 800
+  lr_scheduler:
+    value: False
+  optimizer:
+    value: adam
+#command:
+#- ${env}
+#- C:\Users\alber\Desktop\DeepLabV3Plus-Augmented-SuperResolution\venv\Scripts\python.exe
+#- ${program}
+#- ${args}

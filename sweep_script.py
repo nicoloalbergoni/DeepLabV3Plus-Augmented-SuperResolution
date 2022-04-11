@@ -9,7 +9,7 @@ from utils import load_image
 from superresolution_scripts.superres_utils import min_max_normalization, \
     list_precomputed_data_paths, check_hdf5_validity, threshold_image, single_class_IOU
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 SEED = 1234
 
@@ -19,9 +19,9 @@ tf.random.set_seed(SEED)
 # tf.config.run_functions_eagerly(True)
 
 IMG_SIZE = (512, 512)
-NUM_AUG = 100
+NUM_AUG = 1
 CLASS_ID = 8
-NUM_SAMPLES = 100
+NUM_SAMPLES = 1
 MODE = "slice"
 USE_VALIDATION = False
 
@@ -146,7 +146,8 @@ def main():
         "optimizer": "adam",
         "df_lp_norm": 2.0,
         "num_aug": NUM_AUG,
-        "num_samples": NUM_SAMPLES
+        "num_samples": NUM_SAMPLES,
+        "lr_scheduler": False
     }
 
     wandb_dir = os.path.join(DATA_DIR, "wandb_logs")
@@ -157,9 +158,9 @@ def main():
 
     config = wandb.config
 
-    superresolution = Superresolution(config.lambda_df, config.lambda_tv, config.lambda_eng, num_iter=config.num_iter,
+    superresolution = Superresolution(lambda_df=config.lambda_df,lambda_tv=config.lambda_tv, lambda_eng=config.lambda_eng, lambda_L1=config.lambda_L1,  num_iter=config.num_iter,
                                       learning_rate=config.learning_rate, optimizer=config.optimizer,
-                                      num_aug=config.num_aug, verbose=False)
+                                      num_aug=config.num_aug, lr_scheduler=config.lr_scheduler, verbose=False)
 
     path_list = list_precomputed_data_paths(PRECOMPUTED_OUTPUT_DIR, sort=True)
     precomputed_data_paths = path_list if config.num_samples is None else path_list[:config.num_samples]

@@ -6,7 +6,7 @@ import tensorflow_addons as tfa
 class Superresolution:
     def __init__(self, lambda_df, lambda_tv, lambda_eng, lambda_L1=0.0, num_iter=200, learning_rate=1e-3,
                  optimizer="adam", feature_size=(64, 64), output_size=(512, 512), num_aug=100,
-                 verbose=False, df_lp_norm=2.0):
+                 verbose=False, df_lp_norm=2.0, lr_scheduler=False):
 
         self.lambda_df, self.lambda_tv, self.lambda_eng, self.lambda_L1 = Superresolution.__normalize_coefficients(
             lambda_df, lambda_tv,
@@ -19,6 +19,7 @@ class Superresolution:
         self.verbose = verbose
         self.optimizer = optimizer
         self.df_lp_norm = df_lp_norm
+        self.lr_scheduler = lr_scheduler
 
     @staticmethod
     def __normalize_coefficients(lambda_df, lambda_tv, lambda_eng, lambda_L1):
@@ -67,8 +68,15 @@ class Superresolution:
             optimizer = tf.optimizers.Adadelta(learning_rate=self.learning_rate)
         elif self.optimizer == "adagrad":
             optimizer = tf.optimizers.Adagrad(learning_rate=self.learning_rate)
+        elif self.optimizer == "sgd":
+            optimizer = tf.optimizers.SGD(learning_rate=self.learning_rate, momentum=.9, nesterov=True)
         else:
             optimizer = tf.optimizers.Adam(learning_rate=self.learning_rate)
+
+        if self.lr_scheduler:
+            lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
+                self.learning_rate, decay_steps=300, decay_rate=0.9
+            )
 
         # Variable for the target output image
         target_image = tf.Variable(tf.zeros([1, self.output_size[0], self.output_size[1], 1]), name="Target_Image")
@@ -76,6 +84,10 @@ class Superresolution:
 
         for i in range(self.num_iter):
             # optimizer.minimize(lambda: self.loss_function(target_image, augmented_samples), var_list=[target_image])
+            if self.lr_scheduler:
+                lr = lr_schedule(i)
+                optimizer.learning_rate = lr
+
             with tf.GradientTape() as tape:
                 loss = self.loss_function(target_image, augmented_samples, angles, shifts)
 

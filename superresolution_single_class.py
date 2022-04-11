@@ -18,9 +18,10 @@ tf.random.set_seed(SEED)
 tf.config.run_functions_eagerly(True)
 
 IMG_SIZE = (512, 512)
-NUM_AUG = 100
+NUM_AUG = 1
 CLASS_ID = 8
-NUM_SAMPLES = 100
+NUM_SAMPLES = 1
+
 MODE = "slice"
 USE_VALIDATION = False
 
@@ -137,16 +138,17 @@ def compare_results(superres_dict, image_size=(512, 512), verbose=False):
 def main():
 
     superres_args = {
-        "lambda_df": 0.7771,
-        "lambda_tv": 0.5737,
-        "lambda_eng": 1.228,
+        "lambda_df": 1,
+        "lambda_tv": 0.5,
+        "lambda_eng": 0.5,
         "lambda_L1": 0.0,
         # "num_iter": hp.Int("num_iter", min_value=400, max_value=800, step=50),
-        "num_iter": 450,
+        "num_iter": 1000,
         "learning_rate": 1e-3,
         # "optimizer": hp.Choice("optimizer", ["adam", "adadelta", "adagrad"])
         "optimizer": "adam",
-        "df_lp_norm": 2.0
+        "df_lp_norm": 2.0,
+        "lr_scheduler": False
     }
 
     superresolution = Superresolution(
@@ -158,7 +160,7 @@ def main():
     if not os.path.exists(wandb_dir):
         os.makedirs(wandb_dir)
 
-    run = wandb.init(project="Single Evaluations", entity="albergoni-nicolo", dir=wandb_dir, name="Class Refactor 1",
+    run = wandb.init(project="Single Evaluations", entity="albergoni-nicolo", dir=wandb_dir, name="Sanity Check",
                      config=superres_args)
 
     wandb.config.num_aug = NUM_AUG
@@ -169,7 +171,7 @@ def main():
 
     superres_masks_dict, losses = compute_superresolution_output(precomputed_data_paths, superresolution, mode=MODE,
                                                                  dest_folder=SUPERRES_OUTPUT_DIR, num_aug=NUM_AUG,
-                                                                 global_normalize=True, save_output=False)
+                                                                 global_normalize=True, save_output=True)
 
     superres_masks_dict_th = {}
 

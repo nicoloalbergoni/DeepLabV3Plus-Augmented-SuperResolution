@@ -15,9 +15,9 @@ tf.random.set_seed(SEED)
 
 IMG_SIZE = (512, 512)
 BATCH_SIZE = 8
-NUM_AUG = 100
+NUM_AUG = 1
 CLASS_ID = 8
-NUM_SAMPLES = None
+NUM_SAMPLES = 1
 MODE = "slice"
 USE_VALIDATION = False
 
