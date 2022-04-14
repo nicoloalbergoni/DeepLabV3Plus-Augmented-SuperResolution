@@ -9,13 +9,12 @@ from utils import load_image
 from superresolution_scripts.superres_utils import min_max_normalization, \
     list_precomputed_data_paths, check_hdf5_validity, threshold_image, single_class_IOU
 
-
 SEED = 1234
 
 np.random.seed(SEED)
 tf.random.set_seed(SEED)
 
-tf.config.run_functions_eagerly(True)
+# tf.config.run_functions_eagerly(True)
 
 IMG_SIZE = (512, 512)
 NUM_AUG = 1
@@ -136,42 +135,65 @@ def compare_results(superres_dict, image_size=(512, 512), verbose=False):
 
 
 def main():
-
-    superres_args = {
-        "lambda_df": 1,
+    hyperparamters_default = {
+        "lambda_df": 4.5,
         "lambda_tv": 0.5,
-        "lambda_L2": 0.5,
-        "lambda_L1": 0.0,
-        # "num_iter": hp.Int("num_iter", min_value=400, max_value=800, step=50),
-        "num_iter": 1000,
+        "lambda_L2": 1.0,
+        "lambda_L1": 0.001,
+        "num_iter": 1500,
         "learning_rate": 1e-3,
-        # "optimizer": hp.Choice("optimizer", ["adam", "adadelta", "adagrad"])
         "optimizer": "adam",
         "df_lp_norm": 2.0,
-        "lr_scheduler": False
+        "num_aug": NUM_AUG,
+        "num_samples": NUM_SAMPLES,
+        "lr_scheduler": True,
+        "momentum": 0.6,
+        "nesterov": False,
+        "decay_rate": 0.4,
+        "decay_steps": 50,
+        "beta_1": 0.9,
+        "beta_2": 0.999,
+        "epsilon": 1.0,
+        "amsgrad": False,
     }
-
-    superresolution = Superresolution(
-        **superres_args,
-        verbose=False
-    )
 
     wandb_dir = os.path.join(DATA_DIR, "wandb_logs")
     if not os.path.exists(wandb_dir):
         os.makedirs(wandb_dir)
 
-    run = wandb.init(project="Single Evaluations", entity="albergoni-nicolo", dir=wandb_dir, name="Sanity Check",
-                     config=superres_args)
+    # wandb.init(project="Single Evaluations", entity="albergoni-nicolo", dir=wandb_dir, name="Sanity Check",
+    #            config=hyperparamters_default)
 
-    wandb.config.num_aug = NUM_AUG
-    wandb.config.num_sample = NUM_SAMPLES
+    wandb.init(config=hyperparamters_default)
+
+    config = wandb.config
+
+    optimizer_config = {
+        "lr_scheduler": config.lr_scheduler,
+        "momentum": config.momentum,
+        "nesterov": config.nesterov,
+        "decay_rate": config.decay_rate,
+        "decay_steps": config.decay_steps,
+        "beta_1": config.beta_1,
+        "beta_2": config.beta_2,
+        "epsilon": config.epsilon,
+        "amsgrad": config.amsgrad,
+    }
+
+    superresolution = Superresolution(lambda_df=config.lambda_df, lambda_tv=config.lambda_tv,
+                                      lambda_L2=config.lambda_L2, lambda_L1=config.lambda_L1, num_iter=config.num_iter,
+                                      learning_rate=config.learning_rate, optimizer=config.optimizer,
+                                      num_aug=config.num_aug, df_lp_norm=config.df_lp_norm,
+                                      lr_scheduler=config.lr_scheduler, verbose=False,
+                                      optimizer_params=optimizer_config)
 
     path_list = list_precomputed_data_paths(PRECOMPUTED_OUTPUT_DIR, sort=True)
-    precomputed_data_paths = path_list if NUM_SAMPLES is None else path_list[:NUM_SAMPLES]
+    precomputed_data_paths = path_list if config.num_samples is None else path_list[:config.num_samples]
 
     superres_masks_dict, losses = compute_superresolution_output(precomputed_data_paths, superresolution, mode=MODE,
-                                                                 dest_folder=SUPERRES_OUTPUT_DIR, num_aug=NUM_AUG,
-                                                                 global_normalize=True, save_output=True)
+                                                                 dest_folder=SUPERRES_OUTPUT_DIR,
+                                                                 num_aug=config.num_aug,
+                                                                 global_normalize=True, save_output=False)
 
     superres_masks_dict_th = {}
 
@@ -188,10 +210,10 @@ def main():
     standard_IOUs, superres_IOUs = compare_results(superres_masks_dict_th, image_size=IMG_SIZE, verbose=False)
     print(f"Standard mean IOU: {np.mean(standard_IOUs)},  Superres mean IOU: {np.mean(superres_IOUs)}")
 
-    run.log({"mean_superres_iou": np.mean(superres_IOUs),
-             "mean_standard_iou": np.mean(standard_IOUs)})
+    wandb.log({"mean_superres_iou": np.mean(superres_IOUs),
+               "mean_standard_iou": np.mean(standard_IOUs)})
 
-    run.finish()
+    wandb.finish()
 
 
 if __name__ == '__main__':

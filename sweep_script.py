@@ -9,7 +9,7 @@ from utils import load_image
 from superresolution_scripts.superres_utils import min_max_normalization, \
     list_precomputed_data_paths, check_hdf5_validity, threshold_image, single_class_IOU
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 SEED = 1234
 
@@ -147,22 +147,43 @@ def main():
         "df_lp_norm": 2.0,
         "num_aug": NUM_AUG,
         "num_samples": NUM_SAMPLES,
-        "lr_scheduler": False
+        "lr_scheduler": False,
+        "momentum": 0.6,
+        "nesterov": False,
+        "decay_rate": 0.4,
+        "decay_steps": 50,
+        "beta_1": 0.9,
+        "beta_2": 0.999,
+        "epsilon": 1.0,
+        "amsgrad": False,
     }
 
     wandb_dir = os.path.join(DATA_DIR, "wandb_logs")
     if not os.path.exists(wandb_dir):
         os.makedirs(wandb_dir)
 
-    wandb.init(config=hyperparamters_default)
+    wandb.init(config=hyperparamters_default, dir=wandb_dir)
 
     config = wandb.config
+
+    optimizer_config = {
+        "lr_scheduler": config.lr_scheduler,
+        "momentum": config.momentum,
+        "nesterov": config.nesterov,
+        "decay_rate": config.decay_rate,
+        "decay_steps": config.decay_steps,
+        "beta_1": config.beta_1,
+        "beta_2": config.beta_2,
+        "epsilon": config.epsilon,
+        "amsgrad": config.amsgrad,
+    }
 
     superresolution = Superresolution(lambda_df=config.lambda_df, lambda_tv=config.lambda_tv,
                                       lambda_L2=config.lambda_L2, lambda_L1=config.lambda_L1, num_iter=config.num_iter,
                                       learning_rate=config.learning_rate, optimizer=config.optimizer,
                                       num_aug=config.num_aug, df_lp_norm=config.df_lp_norm,
-                                      lr_scheduler=config.lr_scheduler, verbose=False)
+                                      lr_scheduler=config.lr_scheduler, verbose=False,
+                                      optimizer_params=optimizer_config)
 
     path_list = list_precomputed_data_paths(PRECOMPUTED_OUTPUT_DIR, sort=True)
     precomputed_data_paths = path_list if config.num_samples is None else path_list[:config.num_samples]
