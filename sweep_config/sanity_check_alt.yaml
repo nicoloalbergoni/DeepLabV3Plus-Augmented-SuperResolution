@@ -1,0 +1,62 @@
+entity: albergoni-nicolo
+project: Sanity check (Optimizer only Adam)
+program: superresolution_single_class.py
+method: random
+metric:
+  goal: maximize
+  name: mean_superres_iou
+parameters:
+  lambda_df:
+    value: 4.5
+  lambda_tv:
+    value: 0.5
+  lambda_L2:
+    value: 1.0
+  lambda_L1:
+    value: 0.0
+  num_iter:
+    value: 1000
+  lr_scheduler:
+    values:
+      - True
+      - False
+  momentum:
+    min: 0.0
+    max: 1.0
+    distribution: uniform
+  nesterov:
+    values:
+      - True
+      - False
+  decay_rate:
+    min: 0.0
+    max: 1.0
+    distribution: uniform
+  beta_1:
+    min: 0.0
+    max: 1.0
+    distribution: uniform
+  beta_2:
+    min: 0.0
+    max: 1.0
+    distribution: uniform
+  epsilon:
+    min: 0.0
+    max: 1.0
+    distribution: uniform
+  decay_steps:
+    min: 100
+    max: 500
+    distribution: q_uniform
+    q: 50
+  optimizer:
+    value: adam
+  amsgrad:
+    values:
+      - True
+      - False
+command:
+- ${env}
+- C:\Users\alber\Desktop\DeepLabV3Plus-Augmented-SuperResolution\venv\Scripts\python.exe
+- ${program}
+- ${args}
