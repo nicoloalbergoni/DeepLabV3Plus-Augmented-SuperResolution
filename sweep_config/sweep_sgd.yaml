@@ -1,7 +1,7 @@
 entity: albergoni-nicolo
-project: Sweep dropout
+project: Sweep sgd (100 aug)
 program: sweep_script.py
-method: random
+method: bayes
 metric:
   goal: maximize
   name: mean_superres_iou
@@ -26,26 +26,22 @@ parameters:
     min: 0.0
     distribution: q_uniform
     q: 0.05
-  copy_dropout:
-    value: 0.5
   num_iter:
     value: 1000
   optimizer:
-    value: adamax
+    value: sgd
+  nesterov:
+    value: True
+  momentum:
+    value: 0.2
   lr_scheduler:
     value: True
-  beta_1:
-    value: 0.2
-  beta_2:
-    value: 0.6
   decay_rate:
-    value: 0.3
+    value: 0.2
   decay_steps:
     value: 50
-  epsilon:
-    value: 0.25
-#  amsgrad:
-#    value: True
+  num_aug:
+    value: 100
 #command:
 #- ${env}
 #- C:\Users\alber\Desktop\DeepLabV3Plus-Augmented-SuperResolution\venv\Scripts\python.exe
