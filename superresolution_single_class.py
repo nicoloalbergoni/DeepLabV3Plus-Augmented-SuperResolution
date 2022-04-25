@@ -14,7 +14,8 @@ SEED = 1234
 np.random.seed(SEED)
 tf.random.set_seed(SEED)
 
-# tf.config.run_functions_eagerly(True)
+#tf.config.run_functions_eagerly(True)
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 IMG_SIZE = (512, 512)
 NUM_AUG = 1
@@ -136,25 +137,27 @@ def compare_results(superres_dict, image_size=(512, 512), verbose=False):
 
 def main():
     hyperparamters_default = {
-        "lambda_df": 4.5,
-        "lambda_tv": 0.5,
-        "lambda_L2": 1.0,
-        "lambda_L1": 0.001,
-        "num_iter": 1500,
+        "lambda_df": 0.9,
+        "lambda_tv": 8.85,
+        "lambda_L2": 0.95,
+        "lambda_L1": 0.1,
+        "num_iter": 1000,
         "learning_rate": 1e-3,
         "optimizer": "adam",
         "df_lp_norm": 2.0,
         "num_aug": NUM_AUG,
         "num_samples": NUM_SAMPLES,
         "lr_scheduler": True,
-        "momentum": 0.6,
-        "nesterov": False,
-        "decay_rate": 0.4,
+        "momentum": 0.2,
+        "nesterov": True,
+        "decay_rate": 0.044314343337787054,
         "decay_steps": 50,
-        "beta_1": 0.9,
-        "beta_2": 0.999,
-        "epsilon": 1.0,
-        "amsgrad": False,
+        "beta_1": 0.7719846985746746,
+        "beta_2": 0.3573657798245379,
+        "epsilon": 0.6709735945304973,
+        "amsgrad": True,
+        "initial_accumulator_value": 0.1,
+        "copy_dropout": 0.0
     }
 
     wandb_dir = os.path.join(DATA_DIR, "wandb_logs")
@@ -164,7 +167,7 @@ def main():
     # wandb.init(project="Single Evaluations", entity="albergoni-nicolo", dir=wandb_dir, name="Sanity Check",
     #            config=hyperparamters_default)
 
-    wandb.init(config=hyperparamters_default)
+    wandb.init(config=hyperparamters_default, dir=wandb_dir)
 
     config = wandb.config
 
@@ -178,6 +181,7 @@ def main():
         "beta_2": config.beta_2,
         "epsilon": config.epsilon,
         "amsgrad": config.amsgrad,
+        "initial_accumulator_value": config.initial_accumulator_value
     }
 
     superresolution = Superresolution(lambda_df=config.lambda_df, lambda_tv=config.lambda_tv,
@@ -185,7 +189,7 @@ def main():
                                       learning_rate=config.learning_rate, optimizer=config.optimizer,
                                       num_aug=config.num_aug, df_lp_norm=config.df_lp_norm,
                                       lr_scheduler=config.lr_scheduler, verbose=False,
-                                      optimizer_params=optimizer_config)
+                                      optimizer_params=optimizer_config, copy_dropout=config.copy_dropout)
 
     path_list = list_precomputed_data_paths(PRECOMPUTED_OUTPUT_DIR, sort=True)
     precomputed_data_paths = path_list if config.num_samples is None else path_list[:config.num_samples]

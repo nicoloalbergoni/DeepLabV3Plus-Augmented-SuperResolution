@@ -9,7 +9,7 @@ from utils import load_image
 from superresolution_scripts.superres_utils import min_max_normalization, \
     list_precomputed_data_paths, check_hdf5_validity, threshold_image, single_class_IOU
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 SEED = 1234
 
@@ -21,7 +21,7 @@ tf.random.set_seed(SEED)
 IMG_SIZE = (512, 512)
 NUM_AUG = 1
 CLASS_ID = 8
-NUM_SAMPLES = 1
+NUM_SAMPLES = 100
 MODE = "slice"
 USE_VALIDATION = False
 
@@ -29,7 +29,7 @@ DATA_DIR = os.path.join(os.getcwd(), "data")
 PASCAL_ROOT = os.path.join(DATA_DIR, "dataset_root", "VOCdevkit", "VOC2012")
 IMGS_PATH = os.path.join(PASCAL_ROOT, "JPEGImages")
 
-SUPERRES_ROOT = os.path.join(DATA_DIR, "superres_root")
+SUPERRES_ROOT = os.path.join(DATA_DIR, "superres_root_no_aug")
 PRECOMPUTED_OUTPUT_DIR = os.path.join(SUPERRES_ROOT, f"precomputed_features{'_validation' if USE_VALIDATION else ''}")
 STANDARD_OUTPUT_DIR = os.path.join(SUPERRES_ROOT, f"standard_output{'_validation' if USE_VALIDATION else ''}")
 SUPERRES_OUTPUT_DIR = os.path.join(SUPERRES_ROOT, f"superres_output{'_validation' if USE_VALIDATION else ''}")
@@ -137,10 +137,10 @@ def compare_results(superres_dict, image_size=(512, 512), verbose=False):
 
 def main():
     hyperparamters_default = {
-        "lambda_df": 0.001,
-        "lambda_tv": 0.001,
-        "lambda_L2": 0.001,
-        "lambda_L1": 0.001,
+        "lambda_df": 0.46,
+        "lambda_tv": 4.75,
+        "lambda_L2": 0.11,
+        "lambda_L1": 0.0,
         "num_iter": 450,
         "learning_rate": 1e-3,
         "optimizer": "adam",
@@ -156,6 +156,8 @@ def main():
         "beta_2": 0.999,
         "epsilon": 1.0,
         "amsgrad": False,
+        "initial_accumulator_value": 0.1,
+        "copy_dropout": 0.5
     }
 
     wandb_dir = os.path.join(DATA_DIR, "wandb_logs")
@@ -176,6 +178,7 @@ def main():
         "beta_2": config.beta_2,
         "epsilon": config.epsilon,
         "amsgrad": config.amsgrad,
+        "initial_accumulator_value": config.initial_accumulator_value
     }
 
     superresolution = Superresolution(lambda_df=config.lambda_df, lambda_tv=config.lambda_tv,
@@ -183,7 +186,7 @@ def main():
                                       learning_rate=config.learning_rate, optimizer=config.optimizer,
                                       num_aug=config.num_aug, df_lp_norm=config.df_lp_norm,
                                       lr_scheduler=config.lr_scheduler, verbose=False,
-                                      optimizer_params=optimizer_config)
+                                      optimizer_params=optimizer_config, copy_dropout=config.copy_dropout)
 
     path_list = list_precomputed_data_paths(PRECOMPUTED_OUTPUT_DIR, sort=True)
     precomputed_data_paths = path_list if config.num_samples is None else path_list[:config.num_samples]
