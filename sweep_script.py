@@ -19,7 +19,7 @@ tf.random.set_seed(SEED)
 # tf.config.run_functions_eagerly(True)
 
 IMG_SIZE = (512, 512)
-NUM_AUG = 1
+NUM_AUG = 100
 CLASS_ID = 8
 NUM_SAMPLES = 100
 MODE = "slice"
@@ -29,7 +29,7 @@ DATA_DIR = os.path.join(os.getcwd(), "data")
 PASCAL_ROOT = os.path.join(DATA_DIR, "dataset_root", "VOCdevkit", "VOC2012")
 IMGS_PATH = os.path.join(PASCAL_ROOT, "JPEGImages")
 
-SUPERRES_ROOT = os.path.join(DATA_DIR, "superres_root_no_aug")
+SUPERRES_ROOT = os.path.join(DATA_DIR, "superres_root")
 PRECOMPUTED_OUTPUT_DIR = os.path.join(SUPERRES_ROOT, f"precomputed_features{'_validation' if USE_VALIDATION else ''}")
 STANDARD_OUTPUT_DIR = os.path.join(SUPERRES_ROOT, f"standard_output{'_validation' if USE_VALIDATION else ''}")
 SUPERRES_OUTPUT_DIR = os.path.join(SUPERRES_ROOT, f"superres_output{'_validation' if USE_VALIDATION else ''}")

@@ -18,7 +18,7 @@ tf.random.set_seed(SEED)
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 IMG_SIZE = (512, 512)
-NUM_AUG = 1
+NUM_AUG = 100
 CLASS_ID = 8
 NUM_SAMPLES = 1
 
@@ -137,26 +137,26 @@ def compare_results(superres_dict, image_size=(512, 512), verbose=False):
 
 def main():
     hyperparamters_default = {
-        "lambda_df": 0.9,
-        "lambda_tv": 8.85,
-        "lambda_L2": 0.95,
-        "lambda_L1": 0.1,
+        "lambda_df": 1,
+        "lambda_tv": 0.05,
+        "lambda_L2": 0.0,
+        "lambda_L1": 0.0,
         "num_iter": 1000,
-        "learning_rate": 1e-3,
-        "optimizer": "adam",
+        "learning_rate": 1e-2,
+        "optimizer": "adagrad",
         "df_lp_norm": 2.0,
         "num_aug": NUM_AUG,
         "num_samples": NUM_SAMPLES,
         "lr_scheduler": True,
         "momentum": 0.2,
         "nesterov": True,
-        "decay_rate": 0.044314343337787054,
+        "decay_rate": 0.5,
         "decay_steps": 50,
-        "beta_1": 0.7719846985746746,
-        "beta_2": 0.3573657798245379,
-        "epsilon": 0.6709735945304973,
+        "beta_1": 0.77,
+        "beta_2": 0.36,
+        "epsilon": 0.08,
         "amsgrad": True,
-        "initial_accumulator_value": 0.1,
+        "initial_accumulator_value": 0.5,
         "copy_dropout": 0.0
     }
 
