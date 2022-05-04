@@ -24,15 +24,15 @@ class Superresolution:
                  optimizer="adam", feature_size=(64, 64), output_size=(512, 512), num_aug=100, use_BTV=False,
                  verbose=False, df_lp_norm=2.0, lr_scheduler=False, optimizer_params=None, copy_dropout=0.0):
 
-        # self.lambda_df, self.lambda_tv, self.lambda_L2, self.lambda_L1 = Superresolution.__normalize_coefficients(
-        #     lambda_df, lambda_tv,
-        #     lambda_L2, lambda_L1)
-        # self.lambda_df = 1.0
+        self.lambda_df, self.lambda_tv, self.lambda_L2, self.lambda_L1 = Superresolution.__normalize_coefficients(
+            0.0, lambda_tv,
+            lambda_L2, lambda_L1)
+        self.lambda_df = 1.0
 
-        self.lambda_df = lambda_df
-        self.lambda_tv = lambda_tv
-        self.lambda_L2 = lambda_L2
-        self.lambda_L1 = lambda_L1
+        # self.lambda_df = lambda_df
+        # self.lambda_tv = lambda_tv
+        # self.lambda_L2 = lambda_L2
+        # self.lambda_L1 = lambda_L1
 
         self.num_iter = num_iter
         self.num_aug = num_aug

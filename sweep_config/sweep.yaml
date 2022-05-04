@@ -1,49 +1,52 @@
 entity: albergoni-nicolo
-project: Sweep dropout
+project: Argmax normalized coeff
 program: sweep_script.py
-method: random
+method: bayes
 metric:
   goal: maximize
   name: mean_superres_iou
 parameters:
   lambda_df:
-    max: 10
-    min: 0.0
-    distribution: q_uniform
-    q: 0.05
+    value: 1.0
   lambda_tv:
-    max: 10
+    max: 5
     min: 0.0
-    distribution: q_uniform
-    q: 0.05
+    distribution: uniform
   lambda_L2:
-    max: 10
+    max: 5
     min: 0.0
-    distribution: q_uniform
-    q: 0.05
+    distribution: uniform
   lambda_L1:
-    max: 10
+    max: 5
     min: 0.0
-    distribution: q_uniform
-    q: 0.05
-  copy_dropout:
-    value: 0.5
+    distribution: uniform
   num_iter:
-    value: 1000
+    value: 500
   optimizer:
-    value: adamax
+    value: adagrad
   lr_scheduler:
     value: True
-  beta_1:
-    value: 0.2
-  beta_2:
-    value: 0.6
   decay_rate:
-    value: 0.3
+    value: 0.5
   decay_steps:
     value: 50
   epsilon:
-    value: 0.25
+    value: 1e-7
+  initial_accumulator_value:
+    value: 0.2
+  num_aug:
+    value: 100
+  learning_rate:
+    value: 1e-2
+  copy_dropout:
+    max: 0.9
+    min: 0.0
+    distribution: q_uniform
+    q: 0.1
+  use_BTV:
+    values:
+      - True
+      - False
 #  amsgrad:
 #    value: True
 #command:

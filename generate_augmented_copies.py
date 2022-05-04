@@ -15,10 +15,10 @@ tf.random.set_seed(SEED)
 
 IMG_SIZE = (512, 512)
 BATCH_SIZE = 8
-NUM_AUG = 1
+NUM_AUG = 100
 CLASS_ID = 8
-NUM_SAMPLES = 1
-MODE = "slice"
+NUM_SAMPLES = 100
+MODE_SLICE = False
 USE_VALIDATION = False
 
 DATA_DIR = os.path.join(os.getcwd(), "data")
@@ -26,7 +26,8 @@ PASCAL_ROOT = os.path.join(DATA_DIR, "dataset_root", "VOCdevkit", "VOC2012")
 IMGS_PATH = os.path.join(PASCAL_ROOT, "JPEGImages")
 
 SUPERRES_ROOT = os.path.join(DATA_DIR, "superres_root")
-PRECOMPUTED_OUTPUT_DIR = os.path.join(SUPERRES_ROOT, f"precomputed_features{'_validation' if USE_VALIDATION else ''}")
+PRECOMPUTED_OUTPUT_DIR = os.path.join(SUPERRES_ROOT,
+                                      f"precomputed_features_{'slice' if MODE_SLICE else 'argmax'}{'_validation' if USE_VALIDATION else ''}")
 STANDARD_OUTPUT_DIR = os.path.join(SUPERRES_ROOT, f"standard_output{'_validation' if USE_VALIDATION else ''}")
 
 
@@ -91,7 +92,7 @@ def create_augmented_copies_chunked(image, num_aug, angle_max, shift_max, chunk_
     return augmented_copies, angles, shifts
 
 
-def compute_augmented_features(image_filenames, model, dest_folder, filter_class_id, mode="slice", num_aug=100,
+def compute_augmented_features(image_filenames, model, dest_folder, filter_class_id, mode_slice=True, num_aug=100,
                                angle_max=0.5, shift_max=30, save_output=False, relu_output=False):
     augmented_features = {}
 
@@ -117,7 +118,7 @@ def compute_augmented_features(image_filenames, model, dest_folder, filter_class
 
         for i, prediction in enumerate(predictions):
 
-            if mode == "slice":
+            if mode_slice:
                 class_slice = prediction[:, :, filter_class_id]
                 class_mask = class_slice[..., np.newaxis]
 
@@ -132,7 +133,7 @@ def compute_augmented_features(image_filenames, model, dest_folder, filter_class
 
                 max_masks.append(max_mask)
 
-            elif mode == "argmax":
+            else:
                 class_mask = create_mask(prediction)
                 # Set to 0 all predictions different from the given class
                 class_mask = tf.where(class_mask == filter_class_id, class_mask, 0)
@@ -143,19 +144,19 @@ def compute_augmented_features(image_filenames, model, dest_folder, filter_class
 
             if save_output:
                 tf.keras.utils.save_img(f"{output_folder}/{i}_class.png", class_mask, scale=True)
-                if mode == "slice":
+                if mode_slice:
                     tf.keras.utils.save_img(f"{output_folder}/{i}_max.png", max_mask, scale=True)
 
         file = h5py.File(f"{output_folder}/{filename}.hdf5", "w")
         file.create_dataset("class_masks", data=class_masks)
 
-        if mode == "slice":
+        if mode_slice:
             file.create_dataset("max_masks", data=max_masks)
 
         file.create_dataset("angles", data=angles)
         file.create_dataset("shifts", data=shifts)
         file.attrs["filename"] = filename
-        file.attrs["mode"] = mode
+        file.attrs["mode"] = "slice" if mode_slice else "argmax"
 
         file.close()
 
@@ -199,7 +200,7 @@ def main():
     shift_max = 30
 
     print("Generating augmented copies...")
-    compute_augmented_features(images_dict, model_no_upsample, mode=MODE,
+    compute_augmented_features(images_dict, model_no_upsample, mode_slice=MODE_SLICE,
                                dest_folder=PRECOMPUTED_OUTPUT_DIR, filter_class_id=CLASS_ID,
                                num_aug=NUM_AUG, angle_max=angle_max, shift_max=shift_max,
                                save_output=False, relu_output=False)

@@ -14,15 +14,15 @@ SEED = 1234
 np.random.seed(SEED)
 tf.random.set_seed(SEED)
 
-# tf.config.run_functions_eagerly(True)
+#tf.config.run_functions_eagerly(True)
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 IMG_SIZE = (512, 512)
-NUM_AUG = 1
+NUM_AUG = 100
 CLASS_ID = 8
 NUM_SAMPLES = 1
 
-MODE = "slice"
+MODE = "argmax"
 USE_VALIDATION = False
 
 DATA_DIR = os.path.join(os.getcwd(), "data")
@@ -30,7 +30,7 @@ PASCAL_ROOT = os.path.join(DATA_DIR, "dataset_root", "VOCdevkit", "VOC2012")
 IMGS_PATH = os.path.join(PASCAL_ROOT, "JPEGImages")
 
 SUPERRES_ROOT = os.path.join(DATA_DIR, "superres_root")
-PRECOMPUTED_OUTPUT_DIR = os.path.join(SUPERRES_ROOT, f"precomputed_features{'_validation' if USE_VALIDATION else ''}")
+PRECOMPUTED_OUTPUT_DIR = os.path.join(SUPERRES_ROOT, f"precomputed_features_{MODE}{'_validation' if USE_VALIDATION else ''}")
 STANDARD_OUTPUT_DIR = os.path.join(SUPERRES_ROOT, f"standard_output{'_validation' if USE_VALIDATION else ''}")
 SUPERRES_OUTPUT_DIR = os.path.join(SUPERRES_ROOT, f"superres_output{'_validation' if USE_VALIDATION else ''}")
 
@@ -208,7 +208,7 @@ def main():
         if MODE == "slice":
             th_mask = threshold_image(target_dict["class"], CLASS_ID, th_mask=target_dict["max"])
         else:
-            th_mask = threshold_image(target_dict["class"], CLASS_ID, th_factor=.15)
+            th_mask = threshold_image(target_dict, CLASS_ID, th_factor=.15)
 
         tf.keras.utils.save_img(f"{SUPERRES_OUTPUT_DIR}/{key}_th.png", th_mask, scale=True)
         superres_masks_dict_th[key] = th_mask
