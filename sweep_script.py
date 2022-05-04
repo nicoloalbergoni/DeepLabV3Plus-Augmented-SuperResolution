@@ -53,14 +53,14 @@ def compute_superresolution_output(precomputed_data_paths, superresolution_obj, 
             continue
 
         filename = file.attrs["filename"]
-        angles = file["angles"][:]
-        shifts = file["shifts"][:]
+        angles = file["angles"][:num_aug]
+        shifts = file["shifts"][:num_aug]
 
-        class_masks = file["class_masks"][:]
+        class_masks = file["class_masks"][:num_aug]
         class_masks = tf.stack(class_masks)
 
         if mode == "slice":
-            max_masks = file["max_masks"][:]
+            max_masks = file["max_masks"][:num_aug]
             max_masks = tf.stack(max_masks)
 
         file.close()
@@ -157,7 +157,8 @@ def main():
         "epsilon": 1.0,
         "amsgrad": False,
         "initial_accumulator_value": 0.1,
-        "copy_dropout": 0.5
+        "copy_dropout": 0.5,
+        "use_BTV": True
     }
 
     wandb_dir = os.path.join(DATA_DIR, "wandb_logs")
@@ -186,7 +187,8 @@ def main():
                                       learning_rate=config.learning_rate, optimizer=config.optimizer,
                                       num_aug=config.num_aug, df_lp_norm=config.df_lp_norm,
                                       lr_scheduler=config.lr_scheduler, verbose=False,
-                                      optimizer_params=optimizer_config, copy_dropout=config.copy_dropout)
+                                      optimizer_params=optimizer_config, copy_dropout=config.copy_dropout,
+                                      use_BTV=config.use_BTV)
 
     path_list = list_precomputed_data_paths(PRECOMPUTED_OUTPUT_DIR, sort=True)
     precomputed_data_paths = path_list if config.num_samples is None else path_list[:config.num_samples]

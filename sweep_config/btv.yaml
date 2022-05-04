@@ -1,5 +1,5 @@
 entity: albergoni-nicolo
-project: Sweep BTV 3
+project: BTV df 1
 program: sweep_script.py
 method: bayes
 metric:
@@ -7,30 +7,21 @@ metric:
   name: mean_superres_iou
 parameters:
   lambda_df:
-    max: 10
-    min: 0.0
-    distribution: q_uniform
-    q: 0.05
+    value: 1.0
   lambda_tv:
-    max: 10
+    max: 5
     min: 0.0
-    distribution: q_uniform
-    q: 0.05
+    distribution: uniform
   lambda_L2:
-    max: 10
+    max: 5
     min: 0.0
-    distribution: q_uniform
-    q: 0.05
+    distribution: uniform
   lambda_L1:
-    max: 10
+    max: 5
     min: 0.0
-    distribution: q_uniform
-    q: 0.05
+    distribution: uniform
   num_iter:
-    max: 1500
-    min: 300
-    distribution: q_uniform
-    q: 100
+    value: 600
   optimizer:
     value: adagrad
   lr_scheduler:
@@ -42,16 +33,13 @@ parameters:
   epsilon:
     value: 1e-7
   initial_accumulator_value:
-    max: 1
-    min: 0.1
-    distribution: q_uniform
-    q: 0.1
+    value: 0.2
   num_aug:
     value: 100
   learning_rate:
-    value: 0.01
+    value: 1e-2
   copy_dropout:
-    max: 1
+    max: 0.9
     min: 0.0
     distribution: q_uniform
     q: 0.1

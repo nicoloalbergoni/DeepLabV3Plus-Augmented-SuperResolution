@@ -14,11 +14,11 @@ SEED = 1234
 np.random.seed(SEED)
 tf.random.set_seed(SEED)
 
-#tf.config.run_functions_eagerly(True)
+# tf.config.run_functions_eagerly(True)
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 IMG_SIZE = (512, 512)
-NUM_AUG = 100
+NUM_AUG = 1
 CLASS_ID = 8
 NUM_SAMPLES = 1
 
@@ -53,14 +53,14 @@ def compute_superresolution_output(precomputed_data_paths, superresolution_obj, 
             continue
 
         filename = file.attrs["filename"]
-        angles = file["angles"][:]
-        shifts = file["shifts"][:]
+        angles = file["angles"][:num_aug]
+        shifts = file["shifts"][:num_aug]
 
-        class_masks = file["class_masks"][:]
+        class_masks = file["class_masks"][:num_aug]
         class_masks = tf.stack(class_masks)
 
         if mode == "slice":
-            max_masks = file["max_masks"][:]
+            max_masks = file["max_masks"][:num_aug]
             max_masks = tf.stack(max_masks)
 
         file.close()
@@ -137,27 +137,28 @@ def compare_results(superres_dict, image_size=(512, 512), verbose=False):
 
 def main():
     hyperparamters_default = {
-        "lambda_df": 1,
-        "lambda_tv": 0.05,
-        "lambda_L2": 0.0,
-        "lambda_L1": 0.0,
+        "lambda_df": 0.9,
+        "lambda_tv": 8.85,
+        "lambda_L2": 0.95,
+        "lambda_L1": 0.1,
         "num_iter": 1000,
-        "learning_rate": 1e-2,
-        "optimizer": "adagrad",
+        "learning_rate": 1e-3,
+        "optimizer": "adam",
         "df_lp_norm": 2.0,
         "num_aug": NUM_AUG,
         "num_samples": NUM_SAMPLES,
         "lr_scheduler": True,
         "momentum": 0.2,
         "nesterov": True,
-        "decay_rate": 0.5,
+        "decay_rate": 0.285,
         "decay_steps": 50,
-        "beta_1": 0.77,
-        "beta_2": 0.36,
-        "epsilon": 0.08,
+        "beta_1": 0.105,
+        "beta_2": 0.495,
+        "epsilon": 0.2477,
         "amsgrad": True,
-        "initial_accumulator_value": 0.5,
-        "copy_dropout": 0.0
+        "initial_accumulator_value": 0.3,
+        "copy_dropout": 0.0,
+        "use_BTV": True
     }
 
     wandb_dir = os.path.join(DATA_DIR, "wandb_logs")
@@ -189,7 +190,8 @@ def main():
                                       learning_rate=config.learning_rate, optimizer=config.optimizer,
                                       num_aug=config.num_aug, df_lp_norm=config.df_lp_norm,
                                       lr_scheduler=config.lr_scheduler, verbose=False,
-                                      optimizer_params=optimizer_config, copy_dropout=config.copy_dropout)
+                                      optimizer_params=optimizer_config, copy_dropout=config.copy_dropout,
+                                      use_BTV=config.use_BTV)
 
     path_list = list_precomputed_data_paths(PRECOMPUTED_OUTPUT_DIR, sort=True)
     precomputed_data_paths = path_list if config.num_samples is None else path_list[:config.num_samples]

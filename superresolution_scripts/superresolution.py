@@ -3,7 +3,8 @@ import tensorflow as tf
 import tensorflow_addons as tfa
 
 
-def bilateral_tv(target_image, alpha=0.6, shift_factor=2):
+@tf.function
+def bilateral_tv(target_image, alpha=0.6, shift_factor=3):
     h_shifts = np.arange(-shift_factor, shift_factor + 1, step=1)
     v_shifts = np.arange(0, shift_factor + 1, step=1)
     pairs = [[h, v] for h in h_shifts for v in v_shifts]
@@ -20,13 +21,13 @@ def bilateral_tv(target_image, alpha=0.6, shift_factor=2):
 
 class Superresolution:
     def __init__(self, lambda_df, lambda_tv, lambda_L2, lambda_L1=0.0, num_iter=200, learning_rate=1e-3,
-                 optimizer="adam", feature_size=(64, 64), output_size=(512, 512), num_aug=100,
+                 optimizer="adam", feature_size=(64, 64), output_size=(512, 512), num_aug=100, use_BTV=False,
                  verbose=False, df_lp_norm=2.0, lr_scheduler=False, optimizer_params=None, copy_dropout=0.0):
 
         # self.lambda_df, self.lambda_tv, self.lambda_L2, self.lambda_L1 = Superresolution.__normalize_coefficients(
         #     lambda_df, lambda_tv,
         #     lambda_L2, lambda_L1)
-        # # self.lambda_df = 1.0
+        # self.lambda_df = 1.0
 
         self.lambda_df = lambda_df
         self.lambda_tv = lambda_tv
@@ -44,6 +45,7 @@ class Superresolution:
         self.lr_scheduler = lr_scheduler
         self.optimizer_params = optimizer_params
         self.copy_dropout = copy_dropout
+        self.use_BTV = use_BTV
 
     @staticmethod
     def __normalize_coefficients(lambda_df, lambda_tv, lambda_L2, lambda_L1):
@@ -80,10 +82,14 @@ class Superresolution:
         # df = tf.reduce_sum(
         #     tf.math.square(tf.norm(tf.subtract(D_operator, augmented_samples), ord=self.df_lp_norm)))  # Lp norm squared
 
+        # df = tf.reduce_sum(tf.abs(tf.subtract(D_operator, augmented_samples)))
+
         # TV Term
-        target_gradients = tf.image.image_gradients(target_image)
-        # tv = tf.reduce_sum(tf.add(tf.abs(target_gradients[0]), tf.abs(target_gradients[1])))
-        tv = bilateral_tv(target_image)
+        if self.use_BTV:
+            tv = bilateral_tv(target_image)
+        else:
+            target_gradients = tf.image.image_gradients(target_image)
+            tv = tf.reduce_sum(tf.add(tf.abs(target_gradients[0]), tf.abs(target_gradients[1])))
 
         L2_norm = tf.reduce_sum(tf.square(target_image))
 
@@ -101,7 +107,6 @@ class Superresolution:
             loss = tf.add(loss, L1_lambda)
 
         return loss
-
 
     def compute_output(self, augmented_samples, angles, shifts):
         if self.optimizer == "adadelta":
