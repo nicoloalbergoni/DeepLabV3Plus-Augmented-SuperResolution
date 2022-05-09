@@ -18,11 +18,11 @@ tf.random.set_seed(SEED)
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 IMG_SIZE = (512, 512)
-NUM_AUG = 1
+NUM_AUG = 100
 CLASS_ID = 8
 NUM_SAMPLES = 1
 
-MODE = "slice"
+MODE = "argmax"
 USE_VALIDATION = False
 
 DATA_DIR = os.path.join(os.getcwd(), "data")
@@ -30,7 +30,7 @@ PASCAL_ROOT = os.path.join(DATA_DIR, "dataset_root", "VOCdevkit", "VOC2012")
 IMGS_PATH = os.path.join(PASCAL_ROOT, "JPEGImages")
 
 SUPERRES_ROOT = os.path.join(DATA_DIR, "superres_root")
-PRECOMPUTED_OUTPUT_DIR = os.path.join(SUPERRES_ROOT, f"precomputed_features{'_validation' if USE_VALIDATION else ''}")
+PRECOMPUTED_OUTPUT_DIR = os.path.join(SUPERRES_ROOT, f"precomputed_features_{MODE}{'_validation' if USE_VALIDATION else ''}")
 STANDARD_OUTPUT_DIR = os.path.join(SUPERRES_ROOT, f"standard_output{'_validation' if USE_VALIDATION else ''}")
 SUPERRES_OUTPUT_DIR = os.path.join(SUPERRES_ROOT, f"superres_output{'_validation' if USE_VALIDATION else ''}")
 
@@ -53,14 +53,14 @@ def compute_superresolution_output(precomputed_data_paths, superresolution_obj, 
             continue
 
         filename = file.attrs["filename"]
-        angles = file["angles"][:]
-        shifts = file["shifts"][:]
+        angles = file["angles"][:num_aug]
+        shifts = file["shifts"][:num_aug]
 
-        class_masks = file["class_masks"][:]
+        class_masks = file["class_masks"][:num_aug]
         class_masks = tf.stack(class_masks)
 
         if mode == "slice":
-            max_masks = file["max_masks"][:]
+            max_masks = file["max_masks"][:num_aug]
             max_masks = tf.stack(max_masks)
 
         file.close()
@@ -150,14 +150,15 @@ def main():
         "lr_scheduler": True,
         "momentum": 0.2,
         "nesterov": True,
-        "decay_rate": 0.044314343337787054,
+        "decay_rate": 0.285,
         "decay_steps": 50,
-        "beta_1": 0.7719846985746746,
-        "beta_2": 0.3573657798245379,
-        "epsilon": 0.6709735945304973,
+        "beta_1": 0.105,
+        "beta_2": 0.495,
+        "epsilon": 0.2477,
         "amsgrad": True,
-        "initial_accumulator_value": 0.1,
-        "copy_dropout": 0.0
+        "initial_accumulator_value": 0.3,
+        "copy_dropout": 0.0,
+        "use_BTV": True
     }
 
     wandb_dir = os.path.join(DATA_DIR, "wandb_logs")
@@ -189,7 +190,8 @@ def main():
                                       learning_rate=config.learning_rate, optimizer=config.optimizer,
                                       num_aug=config.num_aug, df_lp_norm=config.df_lp_norm,
                                       lr_scheduler=config.lr_scheduler, verbose=False,
-                                      optimizer_params=optimizer_config, copy_dropout=config.copy_dropout)
+                                      optimizer_params=optimizer_config, copy_dropout=config.copy_dropout,
+                                      use_BTV=config.use_BTV)
 
     path_list = list_precomputed_data_paths(PRECOMPUTED_OUTPUT_DIR, sort=True)
     precomputed_data_paths = path_list if config.num_samples is None else path_list[:config.num_samples]
@@ -206,7 +208,7 @@ def main():
         if MODE == "slice":
             th_mask = threshold_image(target_dict["class"], CLASS_ID, th_mask=target_dict["max"])
         else:
-            th_mask = threshold_image(target_dict["class"], CLASS_ID, th_factor=.15)
+            th_mask = threshold_image(target_dict, CLASS_ID, th_factor=.15)
 
         tf.keras.utils.save_img(f"{SUPERRES_OUTPUT_DIR}/{key}_th.png", th_mask, scale=True)
         superres_masks_dict_th[key] = th_mask

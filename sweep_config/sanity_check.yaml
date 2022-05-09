@@ -1,7 +1,7 @@
 entity: albergoni-nicolo
-project: Sanity check
+project: Sanity check (Adagrad)
 program: sweep_script.py
-method: grid
+method: bayes
 metric:
   goal: maximize
   name: mean_superres_iou
@@ -22,13 +22,28 @@ parameters:
     q: 0.5
     distribution: q_uniform
   lambda_L1:
-    value: 0.0
+    max: 10.5
+    min: 0.5
+    q: 0.5
+    distribution: q_uniform
   num_iter:
     value: 1000
   lr_scheduler:
-    value: False
+    value: True
   optimizer:
-    value: adam
+    value: adagrad
+  decay_rate:
+    value: 0.5
+  decay_steps:
+    value: 50
+  initial_accumulator_value:
+    value: 0.5
+  epsilon:
+    value: 0.08
+  learning_rate:
+    value: 0.1
+  copy_dropout:
+    value: 0.0
 #command:
 #- ${env}
 #- C:\Users\alber\Desktop\DeepLabV3Plus-Augmented-SuperResolution\venv\Scripts\python.exe

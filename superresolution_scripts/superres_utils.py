@@ -130,10 +130,10 @@ def list_precomputed_data_paths(root_dir, sort=False):
 
 
 def check_hdf5_validity(file, num_aug=100):
-    # Check if all datasets in the file have the right cardinality
+    # Check if all datasets in the hdf5 file have at least num_aug images
     for keys in file:
         num = file[keys].shape[0]
-        if num != num_aug:
+        if num < num_aug:
             return False
 
     return True
