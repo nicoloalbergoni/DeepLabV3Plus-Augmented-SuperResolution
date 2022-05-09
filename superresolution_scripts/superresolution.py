@@ -138,7 +138,11 @@ class Superresolution:
             )
 
         # Variable for the target output image
-        target_image = tf.Variable(tf.zeros([1, self.output_size[0], self.output_size[1], 1]), name="Target_Image")
+        # target_image = tf.Variable(tf.zeros([1, self.output_size[0], self.output_size[1], 1]), name="Target_Image")
+
+        initial_value = tf.image.resize(augmented_samples[0], self.output_size)[tf.newaxis, :]
+        target_image = tf.Variable(initial_value, name="Target_Image")
+
         trainable_vars = [target_image]
 
         n_drop = int(self.num_aug * self.copy_dropout)

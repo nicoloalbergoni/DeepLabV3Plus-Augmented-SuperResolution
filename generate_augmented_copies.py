@@ -17,8 +17,8 @@ IMG_SIZE = (512, 512)
 BATCH_SIZE = 8
 NUM_AUG = 100
 CLASS_ID = 8
-NUM_SAMPLES = 100
-MODE_SLICE = False
+NUM_SAMPLES = 500
+MODE_SLICE = True
 USE_VALIDATION = False
 
 DATA_DIR = os.path.join(os.getcwd(), "data")

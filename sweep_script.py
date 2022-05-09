@@ -22,7 +22,7 @@ IMG_SIZE = (512, 512)
 NUM_AUG = 100
 CLASS_ID = 8
 NUM_SAMPLES = 100
-MODE = "argmax"
+MODE = "slice"
 USE_VALIDATION = False
 
 DATA_DIR = os.path.join(os.getcwd(), "data")

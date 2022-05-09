@@ -1,5 +1,5 @@
 entity: albergoni-nicolo
-project: Argmax normalized coeff
+project: Testing optimizer initialization
 program: sweep_script.py
 method: bayes
 metric:
@@ -9,15 +9,15 @@ parameters:
   lambda_df:
     value: 1.0
   lambda_tv:
-    max: 5
+    max: 10
     min: 0.0
     distribution: uniform
   lambda_L2:
-    max: 5
+    max: 2
     min: 0.0
     distribution: uniform
   lambda_L1:
-    max: 5
+    max: 2
     min: 0.0
     distribution: uniform
   num_iter:
@@ -35,6 +35,8 @@ parameters:
   initial_accumulator_value:
     value: 0.2
   num_aug:
+    value: 100
+  num_samples:
     value: 100
   learning_rate:
     value: 1e-2
