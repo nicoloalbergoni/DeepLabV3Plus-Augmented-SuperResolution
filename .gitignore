@@ -291,3 +291,4 @@ data/*
 !data/pascal_classes.txt
 logs/
 wandb/
+**/*.out

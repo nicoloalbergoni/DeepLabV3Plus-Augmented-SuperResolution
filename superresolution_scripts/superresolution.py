@@ -12,8 +12,10 @@ def bilateral_tv(target_image, alpha=0.6, shift_factor=3):
 
     shifted_batch = tfa.image.translate(target_batched, pairs)
     difference_batched = tf.math.subtract(target_batched, shifted_batch)
-    l1_batched = tf.map_fn(fn=lambda image: tf.norm(image, ord=1), elems=difference_batched)
-    alpha_batched = tf.pow(alpha, tf.cast(tf.reduce_sum(tf.abs(pairs), axis=1), tf.float32))
+    l1_batched = tf.map_fn(fn=lambda image: tf.norm(
+        image, ord=1), elems=difference_batched)
+    alpha_batched = tf.pow(alpha, tf.cast(
+        tf.reduce_sum(tf.abs(pairs), axis=1), tf.float32))
     final_btv_batched = tf.multiply(alpha_batched, l1_batched)
 
     return tf.reduce_sum(final_btv_batched)
@@ -22,7 +24,7 @@ def bilateral_tv(target_image, alpha=0.6, shift_factor=3):
 class Superresolution:
     def __init__(self, lambda_df, lambda_tv, lambda_L2, lambda_L1=0.0, num_iter=200, learning_rate=1e-3,
                  optimizer="adam", feature_size=(64, 64), output_size=(512, 512), num_aug=100, use_BTV=False,
-                 verbose=False, df_lp_norm=2.0, lr_scheduler=False, optimizer_params=None, copy_dropout=0.0):
+                 verbose=False, lr_scheduler=False, optimizer_params=None, copy_dropout=0.0):
 
         self.lambda_df, self.lambda_tv, self.lambda_L2, self.lambda_L1 = Superresolution.__normalize_coefficients(
             0.0, lambda_tv,
@@ -41,7 +43,6 @@ class Superresolution:
         self.learning_rate = learning_rate
         self.verbose = verbose
         self.optimizer = optimizer
-        self.df_lp_norm = df_lp_norm
         self.lr_scheduler = lr_scheduler
         self.optimizer_params = optimizer_params
         self.copy_dropout = copy_dropout
@@ -71,25 +72,29 @@ class Superresolution:
         # as in case of dropout size is different from num_aug
         target_batch_size = tf.shape(augmented_samples)[0]
         target_batched = tf.tile(target_image, [target_batch_size, 1, 1, 1])
-        target_rot = tfa.image.rotate(target_batched, angles, interpolation="bilinear")
-        target_aug = tfa.image.translate(target_rot, shifts, interpolation="bilinear")
+        target_rot = tfa.image.rotate(
+            target_batched, angles, interpolation="bilinear")
+        target_aug = tfa.image.translate(
+            target_rot, shifts, interpolation="bilinear")
 
         # Downsampling operator
-        D_operator = tf.image.resize(target_aug, self.feature_size, name="downsampling")
+        D_operator = tf.image.resize(
+            target_aug, self.feature_size, name="downsampling")
 
         # Data fidelity term
-        df = tf.reduce_sum(tf.math.squared_difference(D_operator, augmented_samples), name="data_fidelity")
+        df = tf.reduce_sum(tf.math.squared_difference(
+            D_operator, augmented_samples), name="data_fidelity")
+        # df = tf.reduce_sum(tf.abs(tf.subtract(D_operator, augmented_samples))) # L1 norm version
         # df = tf.reduce_sum(
-        #     tf.math.square(tf.norm(tf.subtract(D_operator, augmented_samples), ord=self.df_lp_norm)))  # Lp norm squared
-
-        # df = tf.reduce_sum(tf.abs(tf.subtract(D_operator, augmented_samples)))
+        #     tf.math.square(tf.norm(tf.subtract(D_operator, augmented_samples), ord=self.df_lp_norm))) # Lp norm squared
 
         # TV Term
         if self.use_BTV:
             tv = bilateral_tv(target_image)
         else:
             target_gradients = tf.image.image_gradients(target_image)
-            tv = tf.reduce_sum(tf.add(tf.abs(target_gradients[0]), tf.abs(target_gradients[1])))
+            tv = tf.reduce_sum(
+                tf.add(tf.abs(target_gradients[0]), tf.abs(target_gradients[1])))
 
         L2_norm = tf.reduce_sum(tf.square(target_image))
 
@@ -110,7 +115,8 @@ class Superresolution:
 
     def compute_output(self, augmented_samples, angles, shifts):
         if self.optimizer == "adadelta":
-            optimizer = tf.optimizers.Adadelta(learning_rate=self.learning_rate)
+            optimizer = tf.optimizers.Adadelta(
+                learning_rate=self.learning_rate)
         elif self.optimizer == "adagrad":
             optimizer = tf.optimizers.Adagrad(learning_rate=self.learning_rate,
                                               initial_accumulator_value=self.optimizer_params[
@@ -140,7 +146,8 @@ class Superresolution:
         # Variable for the target output image
         # target_image = tf.Variable(tf.zeros([1, self.output_size[0], self.output_size[1], 1]), name="Target_Image")
 
-        initial_value = tf.image.resize(augmented_samples[0], self.output_size)[tf.newaxis, :]
+        initial_value = tf.image.resize(
+            augmented_samples[0], self.output_size)[tf.newaxis, :]
         target_image = tf.Variable(initial_value, name="Target_Image")
 
         trainable_vars = [target_image]
@@ -154,7 +161,8 @@ class Superresolution:
                 optimizer.learning_rate = lr
 
             with tf.GradientTape() as tape:
-                loss = self.loss_function(target_image, augmented_samples, angles, shifts, n_drop=n_drop)
+                loss = self.loss_function(
+                    target_image, augmented_samples, angles, shifts, n_drop=n_drop)
 
                 if self.verbose and (i % 10 == 0 or i == self.num_iter - 1):
                     print(f"{i + 1}/{self.num_iter} -- loss = {loss}")
