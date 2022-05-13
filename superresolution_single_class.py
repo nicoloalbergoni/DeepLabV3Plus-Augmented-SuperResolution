@@ -7,7 +7,7 @@ import tensorflow as tf
 from superresolution_scripts.superresolution import Superresolution
 from utils import load_image
 from superresolution_scripts.superres_utils import min_max_normalization, \
-    list_precomputed_data_paths, check_hdf5_validity, threshold_image, single_class_IOU
+    list_precomputed_data_paths, check_hdf5_validity, threshold_image, single_class_IOU, normalize_coefficients
 
 SEED = 1234
 
@@ -150,12 +150,12 @@ def compare_results(superres_dict, image_size=(512, 512), verbose=False):
 def main():
     hyperparamters_default = {
         "lambda_df": 1.0,
-        "lambda_tv": 0.21,
-        "lambda_L2": 0.95,
-        "lambda_L1": 0.085,
-        "num_iter": 500,
+        "lambda_tv": 0.5,
+        "lambda_L2": 0.5,
+        "lambda_L1": 0.05,
+        "num_iter": 100,
         "learning_rate": 1e-3,
-        "optimizer": "adagrad",
+        "optimizer": "adam",
         "num_aug": NUM_AUG,
         "num_samples": NUM_SAMPLES,
         "lr_scheduler": True,
@@ -163,9 +163,9 @@ def main():
         "nesterov": True,
         "decay_rate": 0.5,
         "decay_steps": 50,
-        "beta_1": 0.105,
-        "beta_2": 0.495,
-        "epsilon": 0.2477,
+        "beta_1": 0.9,
+        "beta_2": 0.999,
+        "epsilon": 1e-7,
         "amsgrad": True,
         "initial_accumulator_value": 0.1,
         "copy_dropout": 0.0,
@@ -183,6 +183,14 @@ def main():
 
     config = wandb.config
 
+    coeff_dict = {
+        "lambda_tv": config.lambda_tv,
+        "lambda_L2": config.lambda_L2,
+        "lambda_L1": config.lambda_L1,
+    }
+
+    coeff_dict = normalize_coefficients(coeff_dict)
+
     optimizer_config = {
         "lr_scheduler": config.lr_scheduler,
         "momentum": config.momentum,
@@ -196,8 +204,7 @@ def main():
         "initial_accumulator_value": config.initial_accumulator_value
     }
 
-    superresolution = Superresolution(lambda_df=config.lambda_df, lambda_tv=config.lambda_tv,
-                                      lambda_L2=config.lambda_L2, lambda_L1=config.lambda_L1, num_iter=config.num_iter,
+    superresolution = Superresolution(lambda_df=config.lambda_df, **coeff_dict, num_iter=config.num_iter,
                                       learning_rate=config.learning_rate, optimizer=config.optimizer,
                                       num_aug=config.num_aug, lr_scheduler=config.lr_scheduler, verbose=False,
                                       optimizer_params=optimizer_config, copy_dropout=config.copy_dropout,

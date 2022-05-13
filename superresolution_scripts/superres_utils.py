@@ -18,18 +18,22 @@ def get_img_paths(image_list_path, image_folder, is_png=False, sort=True):
     Returns: List of full paths to the images
     """
     ext = ".jpg" if not is_png else ".png"
-    paths = [os.path.join(image_folder, line.rstrip() + ext) for line in open(image_list_path)]
+    paths = [os.path.join(image_folder, line.rstrip() + ext)
+             for line in open(image_list_path)]
 
     if sort:
-        paths = sorted(paths, key=lambda p: int(os.path.basename(p).split('.')[0]))
+        paths = sorted(paths, key=lambda p: int(
+            os.path.basename(p).split('.')[0]))
 
     return paths
 
 
 def filter_image(image_path, class_id, image_size=(512, 512)):
 
-    mask_path = image_path.replace("JPEGImages", "SegmentationClassAug").replace("jpg", "png")
-    mask = load_image(mask_path, image_size=image_size, normalize=False, is_png=True, resize_method="nearest")
+    mask_path = image_path.replace(
+        "JPEGImages", "SegmentationClassAug").replace("jpg", "png")
+    mask = load_image(mask_path, image_size=image_size,
+                      normalize=False, is_png=True, resize_method="nearest")
     if np.any(mask == class_id):
         image = load_image(image_path, image_size=image_size, normalize=True)
         return image
@@ -50,11 +54,13 @@ def load_images(path_list, num_images=None, filter_class_id=None, image_size=(51
         image_name = os.path.splitext(os.path.basename(path))[0]
 
         if filter_class_id is not None:
-            image = filter_image(path, class_id=filter_class_id, image_size=image_size)
+            image = filter_image(
+                path, class_id=filter_class_id, image_size=image_size)
             if image is not None:
                 image_dict[image_name] = image
         else:
-            image_dict[image_name] = load_image(path, image_size=image_size, normalize=True)
+            image_dict[image_name] = load_image(
+                path, image_size=image_size, normalize=True)
 
     return image_dict
 
@@ -71,12 +77,14 @@ def min_max_normalization(image, new_min=0.0, new_max=255.0, global_min=None, gl
 def load_precomputed_images(img_folder):
     images = []
     # Sort images based on their filename which is an integer indicating the augmented copy number
-    image_list = sorted([name.replace(".png", "") for name in os.listdir(img_folder) if ".npy" not in name], key=int)
+    image_list = sorted([name.replace(".png", "") for name in os.listdir(
+        img_folder) if ".npy" not in name], key=int)
 
     for img_name in image_list:
         if ".npy" in img_name:
             continue
-        image = load_image(os.path.join(img_folder, f"{img_name}.png"), normalize=False, is_png=True)
+        image = load_image(os.path.join(
+            img_folder, f"{img_name}.png"), normalize=False, is_png=True)
         images.append(image)
 
     return images
@@ -124,7 +132,8 @@ def list_precomputed_data_paths(root_dir, sort=False):
                 paths.append(os.path.join(path, filename))
 
     if sort:
-        paths = sorted(paths, key=lambda p: int(os.path.basename(p).split('.')[0]))
+        paths = sorted(paths, key=lambda p: int(
+            os.path.basename(p).split('.')[0]))
 
     return paths
 
@@ -185,3 +194,14 @@ def single_class_IOU(y_true, y_pred, class_id):
     ious = tf.gather(ious, indices=tf.where(legal_labels))
     return tf.reduce_mean(ious)
 
+
+def normalize_coefficients(coeff_dict):
+    """
+    Given a dictionary of coefficients returns a new dictionary 
+    containing the normalized coefficients such that they sum up to one
+    """
+    normalizer = np.sum(list(coeff_dict.values()))
+    new_dict = {key: (value / normalizer)
+                for (key, value) in coeff_dict.items()}
+
+    return new_dict
