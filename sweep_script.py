@@ -5,6 +5,7 @@ import numpy as np
 from tqdm import tqdm
 import tensorflow as tf
 from superresolution_scripts.superresolution import Superresolution
+from superresolution_scripts.optimizer import Optimizer
 from utils import load_image
 from superresolution_scripts.superres_utils import min_max_normalization, \
     list_precomputed_data_paths, check_hdf5_validity, threshold_image, single_class_IOU, normalize_coefficients
@@ -38,8 +39,8 @@ SUPERRES_OUTPUT_DIR = os.path.join(
     SUPERRES_ROOT, f"superres_output{'_validation' if USE_VALIDATION else ''}")
 
 
-def compute_superresolution_output(precomputed_data_paths, superresolution_obj, dest_folder, mode_slice=True, num_aug=100,
-                                   global_normalize=True, save_output=False):
+def compute_superresolution_output(precomputed_data_paths, superresolution_obj: Superresolution, optimizer_obj: Optimizer,
+                                   dest_folder, mode_slice=True, num_aug=100, global_normalize=True, save_output=False):
     superres_masks = {}
     losses = {}
 
@@ -75,8 +76,8 @@ def compute_superresolution_output(precomputed_data_paths, superresolution_obj, 
             fn=lambda image: min_max_normalization(image.numpy(), new_min=0.0, new_max=1.0, global_min=global_min,
                                                    global_max=global_max), elems=class_masks)
 
-        target_image_class, class_loss = superresolution_obj.augmented_superresolution(
-            class_masks, angles, shifts)
+        target_image_class, class_loss = superresolution_obj.augmented_superresolution(optimizer_obj,
+                                                                                       class_masks, angles, shifts)
         target_image_class = (target_image_class[0]).numpy()
         # print(f"Final class loss for image {filename}: {class_loss}")
 
@@ -88,8 +89,8 @@ def compute_superresolution_output(precomputed_data_paths, superresolution_obj, 
                 fn=lambda image: min_max_normalization(image.numpy(), new_min=0.0, new_max=1.0, global_min=global_min,
                                                        global_max=global_max), elems=max_masks)
 
-            target_image_max, max_loss = superresolution_obj.augmented_superresolution(
-                max_masks, angles, shifts)
+            target_image_max, max_loss = superresolution_obj.augmented_superresolution(optimizer_obj,
+                                                                                       max_masks, angles, shifts)
             target_image_max = (target_image_max[0]).numpy()
             # print(f"Final max loss for image {filename}: {max_loss}")
 
@@ -154,22 +155,22 @@ def main():
         "lambda_L2": 0.11,
         "lambda_L1": 0.0,
         "num_iter": 450,
-        "learning_rate": 1e-3,
-        "optimizer": "adam",
         "num_aug": NUM_AUG,
         "num_samples": NUM_SAMPLES,
-        "lr_scheduler": False,
-        "momentum": 0.6,
-        "nesterov": False,
-        "decay_rate": 0.4,
-        "decay_steps": 50,
+        "use_BTV": True,
+        "copy_dropout": 0.5,
+        "optimizer": "adam",
+        "learning_rate": 1e-3,
         "beta_1": 0.9,
         "beta_2": 0.999,
         "epsilon": 1e-7,
         "amsgrad": False,
         "initial_accumulator_value": 0.1,
-        "copy_dropout": 0.5,
-        "use_BTV": True
+        "momentum": 0.6,
+        "nesterov": False,
+        "lr_scheduler": False,
+        "decay_steps": 50,
+        "decay_rate": 0.4,
     }
 
     wandb_dir = os.path.join(DATA_DIR, "wandb_logs")
@@ -188,30 +189,18 @@ def main():
 
     coeff_dict = normalize_coefficients(coeff_dict)
 
-    optimizer_config = {
-        "lr_scheduler": config.lr_scheduler,
-        "momentum": config.momentum,
-        "nesterov": config.nesterov,
-        "decay_rate": config.decay_rate,
-        "decay_steps": config.decay_steps,
-        "beta_1": config.beta_1,
-        "beta_2": config.beta_2,
-        "epsilon": config.epsilon,
-        "amsgrad": config.amsgrad,
-        "initial_accumulator_value": config.initial_accumulator_value
-    }
+    optimizer = Optimizer(optimizer=config.optimizer, learning_rate=config.learning_rate, epsilon=config.epsilon, beta_1=config.beta_1, beta_2=config.beta_2,
+                          amsgrad=config.amsgrad, initial_accumulator_value=config.initial_accumulator_value, momentum=config.momentum, nesterov=config.nesterov,
+                          lr_scheduler=config.lr_scheduler, decay_steps=config.decay_steps, decay_rate=config.decay_rate)
 
     superresolution = Superresolution(lambda_df=config.lambda_df, **coeff_dict, num_iter=config.num_iter,
-                                      learning_rate=config.learning_rate, optimizer=config.optimizer,
-                                      num_aug=config.num_aug, lr_scheduler=config.lr_scheduler, verbose=False,
-                                      optimizer_params=optimizer_config, copy_dropout=config.copy_dropout,
-                                      use_BTV=config.use_BTV)
+                                      num_aug=config.num_aug, use_BTV=config.use_BTV, copy_dropout=config.copy_dropout)
 
     path_list = list_precomputed_data_paths(PRECOMPUTED_OUTPUT_DIR, sort=True)
     precomputed_data_paths = path_list if config.num_samples is None else path_list[
         :config.num_samples]
 
-    superres_masks_dict, losses = compute_superresolution_output(precomputed_data_paths, superresolution, mode_slice=MODE_SLICE,
+    superres_masks_dict, losses = compute_superresolution_output(precomputed_data_paths, superresolution, optimizer, mode_slice=MODE_SLICE,
                                                                  dest_folder=SUPERRES_OUTPUT_DIR,
                                                                  num_aug=config.num_aug,
                                                                  global_normalize=True, save_output=False)

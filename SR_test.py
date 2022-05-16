@@ -1,10 +1,13 @@
 import os
 import numpy as np
+import pandas as pd
+from tqdm import tqdm
 import tensorflow as tf
 import tensorflow_addons as tfa
 from utils import load_image, plot_images
 from skimage.metrics import mean_squared_error, structural_similarity, peak_signal_noise_ratio
 from superresolution_scripts.superresolution import Superresolution
+from superresolution_scripts.optimizer import Optimizer
 from superresolution_scripts.superres_utils import min_max_normalization, normalize_coefficients
 
 # os.environ["CUDA_VISIBLE_DEVICES"] = "1"
@@ -44,81 +47,83 @@ def generate_augmented_copies(original_image, angle_max, shift_max, num_aug=100,
     return translated_images, angles, shifts
 
 
-def solve_superresolution(superresolution_obj, augmented_copies, angles, shifts):
+def test_aug_params(original_image, superres_obj: Superresolution, optimizer_obj: Optimizer):
 
-    global_min = tf.reduce_min(augmented_copies)
-    global_max = tf.reduce_max(augmented_copies)
+    angle_max_range = np.arange(0.0, 1.0, step=0.1)
+    shift_max_range = np.arange(0, 60, step=10)
+    angle_shift_permutations = [(a, s)
+                                for a in angle_max_range for s in shift_max_range]
+    data_list = []
 
-    # augmented_copies = tf.map_fn(fn=lambda image: min_max_normalization(image.numpy(
-    # ), new_min=0.0, new_max=1.0, global_min=global_min, global_max=global_max), elems=augmented_copies)
+    for i, (angle_max, shift_max) in tqdm(enumerate(angle_shift_permutations)):
+        augmented_copies, angles, shifts = generate_augmented_copies(
+            original_image, angle_max=angle_max, shift_max=shift_max, num_aug=NUM_AUG)
 
-    target_image, loss = superresolution_obj.compute_output(
-        augmented_copies, angles, shifts)
+        target_image, loss = superres_obj.augmented_superresolution(optimizer_obj,
+                                                                    augmented_copies, angles, shifts)
 
-    return target_image, loss
+        target_image = target_image[0].numpy()
+        # original_image = original_image.numpy()
+
+        tf.keras.utils.save_img(
+            f"{IMAGE_FOLDER}/test_image_{i}_SR.png", target_image, scale=True)
+
+        # mse = tf.keras.metrics.mean_squared_error(original_image, target_image)
+        mse = mean_squared_error(original_image, target_image)
+        psnr = peak_signal_noise_ratio(
+            original_image, target_image, data_range=1)
+        ssm = structural_similarity(
+            original_image, target_image, multichannel=True)
+
+        data_list.append(
+            {"Angle_max": angle_max, "Shift Max": shift_max, "MSE": mse, "PSNR": psnr, "SSM": ssm, "Loss": loss.numpy()})
+
+    return pd.DataFrame(data_list)
 
 
 def main():
 
     coeff_dict = {
-        "lambda_tv": 0.5,
-        "lambda_L2": 0.5,
-        "lambda_L1": 0.05,
+        "lambda_tv": 0.2,
+        "lambda_L2": 0.01,
+        "lambda_L1": 0.00,
     }
 
-    normalize_coefficients(coeff_dict)
+    coeff_dict = normalize_coefficients(coeff_dict)
 
     superres_params = {
         "lambda_df": 1.0,
-        **coeff_dict,
-        "num_iter": 100,
-        "learning_rate": 1e-3,
-        "optimizer": "adam",
+        "num_iter": 200,
         "num_aug": NUM_AUG,
-        "copy_dropout": 0.0,
-        "use_BTV": False
+        "use_BTV": False,
+        "copy_dropout": 0.0
     }
-
-    # superres_params["lambda_tv"], superres_params["lambda_L2"], superres_params["lambda_L1"] = normalize_coefficients(
-    #     [0.6, 0.55, 0.085])
 
     optimizer_config = {
-        "lr_scheduler": True,
-        "momentum": 0.2,
-        "nesterov": True,
-        "decay_rate": 0.5,
-        "decay_steps": 50,
+        "optimizer": "adam",
+        "learning_rate": 1e-3,
+        "epsilon": 1e-7,
         "beta_1": 0.9,
         "beta_2": 0.999,
-        "epsilon": 1e-7,
         "amsgrad": True,
         "initial_accumulator_value": 0.1,
+        "momentum": 0.2,
+        "nesterov": True,
+        "lr_scheduler": True,
+        "decay_rate": 0.5,
+        "decay_steps": 50
     }
 
-    superres_obj = Superresolution(
-        **superres_params, optimizer_params=optimizer_config)
+    optimizer = Optimizer(**optimizer_config)
+
+    superres_obj = Superresolution(**superres_params, **coeff_dict)
     image_path = os.path.join(IMAGE_FOLDER, "test_image.png")
     original_image = load_image(image_path, normalize=True, is_png=True)
-    augmented_copies, angles, shifts = generate_augmented_copies(
-        original_image, angle_max=ANGLE_MAX, shift_max=SHIFT_MAX, num_aug=NUM_AUG)
-
-    target_image, loss = solve_superresolution(
-        superres_obj, augmented_copies, angles, shifts)
-
-    target_image = target_image[0].numpy()
     original_image = original_image.numpy()
 
-    tf.keras.utils.save_img(
-        f"{IMAGE_FOLDER}/test_image_SR.png", target_image, scale=True)
-
-    # mse = tf.keras.metrics.mean_squared_error(original_image, target_image)
-    mse = mean_squared_error(original_image, target_image)
-    psnr = peak_signal_noise_ratio(original_image, target_image, data_range=1)
-    ssm = structural_similarity(
-        original_image, target_image, multichannel=True)
-
-    print(f"MSE: {mse}, PSNR: {psnr}, SSM: {ssm}")
-    plot_images([original_image, target_image], rows=1, columns=2)
+    df = test_aug_params(original_image, superres_obj, optimizer)
+    print(df)
+    print(df.loc[df['PSNR'].idxmax()])
 
 
 if __name__ == '__main__':

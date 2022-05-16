@@ -2,6 +2,8 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_addons as tfa
 
+from superresolution_scripts.optimizer import Optimizer
+
 
 @tf.function
 def bilateral_tv(target_image, alpha=0.6, shift_factor=3):
@@ -22,9 +24,8 @@ def bilateral_tv(target_image, alpha=0.6, shift_factor=3):
 
 
 class Superresolution:
-    def __init__(self, lambda_df, lambda_tv, lambda_L2, lambda_L1=0.0, num_iter=200, learning_rate=1e-3,
-                 optimizer="adam", feature_size=(64, 64), output_size=(512, 512), num_aug=100, use_BTV=False,
-                 verbose=False, lr_scheduler=False, optimizer_params=None, copy_dropout=0.0):
+    def __init__(self, lambda_df, lambda_tv, lambda_L2, lambda_L1, num_iter=200, num_aug=100,
+                 feature_size=(64, 64), output_size=(512, 512),  use_BTV=False, verbose=False, copy_dropout=0.0):
 
         self.lambda_df = lambda_df
         self.lambda_tv = lambda_tv
@@ -33,15 +34,11 @@ class Superresolution:
 
         self.num_iter = num_iter
         self.num_aug = num_aug
-        self.output_size = output_size
         self.feature_size = feature_size
-        self.learning_rate = learning_rate
-        self.verbose = verbose
-        self.optimizer = optimizer
-        self.lr_scheduler = lr_scheduler
-        self.optimizer_params = optimizer_params
-        self.copy_dropout = copy_dropout
+        self.output_size = output_size
         self.use_BTV = use_BTV
+        self.verbose = verbose
+        self.copy_dropout = copy_dropout
 
     @tf.function
     def loss_function(self, target_image, augmented_samples, angles, shifts, n_drop=0):
@@ -101,36 +98,7 @@ class Superresolution:
 
         return loss
 
-    def augmented_superresolution(self, augmented_samples, angles, shifts):
-        if self.optimizer == "adadelta":
-            optimizer = tf.optimizers.Adadelta(
-                learning_rate=self.learning_rate)
-        elif self.optimizer == "adagrad":
-            optimizer = tf.optimizers.Adagrad(learning_rate=self.learning_rate,
-                                              initial_accumulator_value=self.optimizer_params[
-                                                  "initial_accumulator_value"],
-                                              epsilon=self.optimizer_params["epsilon"])
-        elif self.optimizer == "adamax":
-            optimizer = tf.keras.optimizers.Adamax(learning_rate=self.learning_rate,
-                                                   epsilon=self.optimizer_params["epsilon"],
-                                                   beta_1=self.optimizer_params["beta_1"],
-                                                   beta_2=self.optimizer_params["beta_2"])
-        elif self.optimizer == "sgd":
-            optimizer = tf.optimizers.SGD(learning_rate=self.learning_rate, momentum=self.optimizer_params["momentum"],
-                                          nesterov=self.optimizer_params["nesterov"])
-        else:
-            optimizer = tf.optimizers.Adam(learning_rate=self.learning_rate,
-                                           epsilon=self.optimizer_params["epsilon"],
-                                           beta_1=self.optimizer_params["beta_1"],
-                                           beta_2=self.optimizer_params["beta_2"],
-                                           amsgrad=self.optimizer_params["amsgrad"])
-
-        if self.lr_scheduler:
-            lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
-                self.learning_rate, decay_steps=self.optimizer_params["decay_steps"],
-                decay_rate=self.optimizer_params["decay_rate"]
-            )
-
+    def augmented_superresolution(self, optimizer: Optimizer, augmented_samples, angles, shifts):
         # Variable for the target output image
         # target_image = tf.Variable(tf.zeros([1, self.output_size[0], self.output_size[1], 1]), name="Target_Image")
 
@@ -145,9 +113,8 @@ class Superresolution:
 
         for i in range(self.num_iter):
             # optimizer.minimize(lambda: self.loss_function(target_image, augmented_samples), var_list=[target_image])
-            if self.lr_scheduler:
-                lr = lr_schedule(i)
-                optimizer.learning_rate = lr
+            if optimizer.lr_scheduler:
+                optimizer.lr_decay(i)
 
             with tf.GradientTape() as tape:
                 loss = self.loss_function(
@@ -157,6 +124,6 @@ class Superresolution:
                     print(f"{i + 1}/{self.num_iter} -- loss = {loss}")
 
             gradients = tape.gradient(loss, trainable_vars)
-            optimizer.apply_gradients(zip(gradients, trainable_vars))
+            optimizer.optimizer.apply_gradients(zip(gradients, trainable_vars))
 
         return target_image, loss
