@@ -101,7 +101,7 @@ class Superresolution:
 
         return loss
 
-    def compute_output(self, augmented_samples, angles, shifts):
+    def augmented_superresolution(self, augmented_samples, angles, shifts):
         if self.optimizer == "adadelta":
             optimizer = tf.optimizers.Adadelta(
                 learning_rate=self.learning_rate)
@@ -134,6 +134,7 @@ class Superresolution:
         # Variable for the target output image
         # target_image = tf.Variable(tf.zeros([1, self.output_size[0], self.output_size[1], 1]), name="Target_Image")
 
+        # Initilizing the variabile with the first non augmented copy
         initial_value = tf.image.resize(
             augmented_samples[0], self.output_size)[tf.newaxis, :]
         target_image = tf.Variable(initial_value, name="Target_Image")

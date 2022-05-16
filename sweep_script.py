@@ -9,7 +9,7 @@ from utils import load_image
 from superresolution_scripts.superres_utils import min_max_normalization, \
     list_precomputed_data_paths, check_hdf5_validity, threshold_image, single_class_IOU, normalize_coefficients
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 SEED = 1234
 
@@ -22,7 +22,7 @@ IMG_SIZE = (512, 512)
 NUM_AUG = 100
 CLASS_ID = 8
 NUM_SAMPLES = 100
-MODE = "slice"
+MODE_SLICE = True
 USE_VALIDATION = False
 
 DATA_DIR = os.path.join(os.getcwd(), "data")
@@ -31,14 +31,14 @@ IMGS_PATH = os.path.join(PASCAL_ROOT, "JPEGImages")
 
 SUPERRES_ROOT = os.path.join(DATA_DIR, "superres_root")
 PRECOMPUTED_OUTPUT_DIR = os.path.join(
-    SUPERRES_ROOT, f"precomputed_features_{MODE}{'_validation' if USE_VALIDATION else ''}")
+    SUPERRES_ROOT, f"precomputed_features_{'slice' if MODE_SLICE else 'argmax'}{'_validation' if USE_VALIDATION else ''}")
 STANDARD_OUTPUT_DIR = os.path.join(
     SUPERRES_ROOT, f"standard_output{'_validation' if USE_VALIDATION else ''}")
 SUPERRES_OUTPUT_DIR = os.path.join(
     SUPERRES_ROOT, f"superres_output{'_validation' if USE_VALIDATION else ''}")
 
 
-def compute_superresolution_output(precomputed_data_paths, superresolution_obj, dest_folder, mode="slice", num_aug=100,
+def compute_superresolution_output(precomputed_data_paths, superresolution_obj, dest_folder, mode_slice=True, num_aug=100,
                                    global_normalize=True, save_output=False):
     superres_masks = {}
     losses = {}
@@ -62,7 +62,7 @@ def compute_superresolution_output(precomputed_data_paths, superresolution_obj, 
         class_masks = file["class_masks"][:num_aug]
         class_masks = tf.stack(class_masks)
 
-        if mode == "slice":
+        if mode_slice:
             max_masks = file["max_masks"][:num_aug]
             max_masks = tf.stack(max_masks)
 
@@ -75,12 +75,12 @@ def compute_superresolution_output(precomputed_data_paths, superresolution_obj, 
             fn=lambda image: min_max_normalization(image.numpy(), new_min=0.0, new_max=1.0, global_min=global_min,
                                                    global_max=global_max), elems=class_masks)
 
-        target_image_class, class_loss = superresolution_obj.compute_output(
+        target_image_class, class_loss = superresolution_obj.augmented_superresolution(
             class_masks, angles, shifts)
         target_image_class = (target_image_class[0]).numpy()
         # print(f"Final class loss for image {filename}: {class_loss}")
 
-        if mode == "slice":
+        if mode_slice:
             global_min, global_max = (tf.reduce_min(max_masks), tf.reduce_max(max_masks)) if global_normalize else (
                 None, None)
 
@@ -88,7 +88,7 @@ def compute_superresolution_output(precomputed_data_paths, superresolution_obj, 
                 fn=lambda image: min_max_normalization(image.numpy(), new_min=0.0, new_max=1.0, global_min=global_min,
                                                        global_max=global_max), elems=max_masks)
 
-            target_image_max, max_loss = superresolution_obj.compute_output(
+            target_image_max, max_loss = superresolution_obj.augmented_superresolution(
                 max_masks, angles, shifts)
             target_image_max = (target_image_max[0]).numpy()
             # print(f"Final max loss for image {filename}: {max_loss}")
@@ -96,12 +96,12 @@ def compute_superresolution_output(precomputed_data_paths, superresolution_obj, 
         if save_output:
             tf.keras.utils.save_img(
                 f"{dest_folder}/{filename}_class.png", target_image_class, scale=True)
-            if mode == "slice":
+            if mode_slice:
                 tf.keras.utils.save_img(
                     f"{dest_folder}/{filename}_max.png", target_image_max, scale=True)
 
         superres_masks[filename] = {"class": target_image_class,
-                                    "max": target_image_max} if mode == "slice" else target_image_class
+                                    "max": target_image_max} if mode_slice else target_image_class
 
     return superres_masks, losses
 
@@ -211,7 +211,7 @@ def main():
     precomputed_data_paths = path_list if config.num_samples is None else path_list[
         :config.num_samples]
 
-    superres_masks_dict, losses = compute_superresolution_output(precomputed_data_paths, superresolution, mode=MODE,
+    superres_masks_dict, losses = compute_superresolution_output(precomputed_data_paths, superresolution, mode_slice=MODE_SLICE,
                                                                  dest_folder=SUPERRES_OUTPUT_DIR,
                                                                  num_aug=config.num_aug,
                                                                  global_normalize=True, save_output=False)
@@ -220,7 +220,7 @@ def main():
 
     for key in superres_masks_dict:
         target_dict = superres_masks_dict[key]
-        if MODE == "slice":
+        if MODE_SLICE:
             th_mask = threshold_image(
                 target_dict["class"], CLASS_ID, th_mask=target_dict["max"])
         else:

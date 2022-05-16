@@ -160,7 +160,7 @@ def threshold_image(image, th_value, th_factor=.15, th_mask=None):
         th_factor: Percentage of the image max value used as thresholding value
         th_mask: Thresholding mask
 
-    Returns: The thresholded image that contains either 0 or value
+    Returns: The thresholded image that contains either 0 or th_value
 
     """
     if th_mask is not None:

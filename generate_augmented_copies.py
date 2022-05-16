@@ -28,7 +28,8 @@ IMGS_PATH = os.path.join(PASCAL_ROOT, "JPEGImages")
 SUPERRES_ROOT = os.path.join(DATA_DIR, "superres_root")
 PRECOMPUTED_OUTPUT_DIR = os.path.join(SUPERRES_ROOT,
                                       f"precomputed_features_{'slice' if MODE_SLICE else 'argmax'}{'_validation' if USE_VALIDATION else ''}")
-STANDARD_OUTPUT_DIR = os.path.join(SUPERRES_ROOT, f"standard_output{'_validation' if USE_VALIDATION else ''}")
+STANDARD_OUTPUT_DIR = os.path.join(
+    SUPERRES_ROOT, f"standard_output{'_validation' if USE_VALIDATION else ''}")
 
 
 def compute_standard_output(image_dict, model, dest_folder, filter_class_id=None):
@@ -41,14 +42,16 @@ def compute_standard_output(image_dict, model, dest_folder, filter_class_id=None
         if filter_class_id is not None:
             standard_mask = tf.where(standard_mask == filter_class_id, standard_mask,
                                      0)  # Set to 0 all predictions different from the given class
-        tf.keras.utils.save_img(f"{dest_folder}/{key}.png", standard_mask, scale=False)
+        tf.keras.utils.save_img(
+            f"{dest_folder}/{key}.png", standard_mask, scale=False)
         standard_masks[key] = standard_mask
 
     return standard_masks
 
 
 def create_augmented_copies(image, num_aug, angle_max, shift_max):
-    batched_images = tf.tile(tf.expand_dims(image, axis=0), [num_aug, 1, 1, 1])  # Size [num_aug, 512, 512, 3]
+    batched_images = tf.tile(tf.expand_dims(image, axis=0), [
+                             num_aug, 1, 1, 1])  # Size [num_aug, 512, 512, 3]
     angles = np.random.uniform(-angle_max, angle_max, num_aug)
     shifts = np.random.uniform(-shift_max, shift_max, (num_aug, 2))
     # First sample is not augmented
@@ -57,8 +60,10 @@ def create_augmented_copies(image, num_aug, angle_max, shift_max):
     angles = angles.astype("float32")
     shifts = shifts.astype("float32")
 
-    rotated_images = tfa.image.rotate(batched_images, angles, interpolation="bilinear")
-    translated_images = tfa.image.translate(rotated_images, shifts, interpolation="bilinear")
+    rotated_images = tfa.image.rotate(
+        batched_images, angles, interpolation="bilinear")
+    translated_images = tfa.image.translate(
+        rotated_images, shifts, interpolation="bilinear")
 
     return translated_images, angles, shifts
 
@@ -82,9 +87,12 @@ def create_augmented_copies_chunked(image, num_aug, angle_max, shift_max, chunk_
     augmented_chunks = []
 
     for i in range(num_chunks):
-        images_chunk = tf.tile(tf.expand_dims(image, axis=0), [chunk_size, 1, 1, 1])
-        rotated_chunk = tfa.image.rotate(images_chunk, angles_chunks[i], interpolation="bilinear")
-        translated_chunk = tfa.image.translate(rotated_chunk, shifts_chunks[i], interpolation="bilinear")
+        images_chunk = tf.tile(tf.expand_dims(
+            image, axis=0), [chunk_size, 1, 1, 1])
+        rotated_chunk = tfa.image.rotate(
+            images_chunk, angles_chunks[i], interpolation="bilinear")
+        translated_chunk = tfa.image.translate(
+            rotated_chunk, shifts_chunks[i], interpolation="bilinear")
         augmented_chunks.append(translated_chunk.numpy())
 
     augmented_copies = np.concatenate(augmented_chunks, axis=0)
@@ -122,7 +130,8 @@ def compute_augmented_features(image_filenames, model, dest_folder, filter_class
                 class_slice = prediction[:, :, filter_class_id]
                 class_mask = class_slice[..., np.newaxis]
 
-                no_class_prediction = np.delete(prediction, filter_class_id, axis=-1)
+                no_class_prediction = np.delete(
+                    prediction, filter_class_id, axis=-1)
                 max_mask = no_class_prediction.max(axis=-1)
                 max_mask = max_mask[..., np.newaxis]
 
@@ -136,16 +145,20 @@ def compute_augmented_features(image_filenames, model, dest_folder, filter_class
             else:
                 class_mask = create_mask(prediction)
                 # Set to 0 all predictions different from the given class
-                class_mask = tf.where(class_mask == filter_class_id, class_mask, 0)
-                class_mask = tf.cast(class_mask, tf.float32)  # Necessary for super-resolution operations
+                class_mask = tf.where(
+                    class_mask == filter_class_id, class_mask, 0)
+                # Necessary for super-resolution operations
+                class_mask = tf.cast(class_mask, tf.float32)
                 class_mask = class_mask.numpy()
 
             class_masks.append(class_mask)
 
             if save_output:
-                tf.keras.utils.save_img(f"{output_folder}/{i}_class.png", class_mask, scale=True)
+                tf.keras.utils.save_img(
+                    f"{output_folder}/{i}_class.png", class_mask, scale=True)
                 if mode_slice:
-                    tf.keras.utils.save_img(f"{output_folder}/{i}_max.png", max_mask, scale=True)
+                    tf.keras.utils.save_img(
+                        f"{output_folder}/{i}_max.png", max_mask, scale=True)
 
         file = h5py.File(f"{output_folder}/{filename}.hdf5", "w")
         file.create_dataset("class_masks", data=class_masks)
@@ -168,8 +181,10 @@ def compute_augmented_features(image_filenames, model, dest_folder, filter_class
 def main():
     image_list_path = os.path.join(DATA_DIR, "augmented_file_lists",
                                    f"{'valaug' if USE_VALIDATION else 'trainaug'}.txt")
-    image_paths = get_img_paths(image_list_path, IMGS_PATH, is_png=False, sort=True)
-    images_dict = load_images(image_paths, num_images=NUM_SAMPLES, filter_class_id=CLASS_ID, image_size=IMG_SIZE)
+    image_paths = get_img_paths(
+        image_list_path, IMGS_PATH, is_png=False, sort=True)
+    images_dict = load_images(
+        image_paths, num_images=NUM_SAMPLES, filter_class_id=CLASS_ID, image_size=IMG_SIZE)
 
     print(f"Valid images: {len(images_dict)} (Initial:  {len(image_paths)})")
 
