@@ -78,8 +78,6 @@ def compute_superresolution_output(precomputed_data_paths, superresolution_obj: 
 
         target_image_class, class_loss = superresolution_obj.augmented_superresolution(optimizer_obj,
                                                                                        class_masks, angles, shifts)
-        target_image_class = (target_image_class[0]).numpy()
-        # print(f"Final class loss for image {filename}: {class_loss}")
 
         if mode_slice:
             global_min, global_max = (tf.reduce_min(max_masks), tf.reduce_max(max_masks)) if global_normalize else (
@@ -91,8 +89,6 @@ def compute_superresolution_output(precomputed_data_paths, superresolution_obj: 
 
             target_image_max, max_loss = superresolution_obj.augmented_superresolution(optimizer_obj,
                                                                                        max_masks, angles, shifts)
-            target_image_max = (target_image_max[0]).numpy()
-            # print(f"Final max loss for image {filename}: {max_loss}")
 
         if save_output:
             tf.keras.utils.save_img(

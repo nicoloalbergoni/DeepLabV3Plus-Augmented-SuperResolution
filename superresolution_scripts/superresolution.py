@@ -98,13 +98,13 @@ class Superresolution:
 
         return loss
 
-    def augmented_superresolution(self, optimizer: Optimizer, augmented_samples, angles, shifts):
+    def augmented_superresolution(self, optimizer: Optimizer, augmented_copies, angles, shifts):
         # Variable for the target output image
         # target_image = tf.Variable(tf.zeros([1, self.output_size[0], self.output_size[1], 1]), name="Target_Image")
 
         # Initilizing the variabile with the first non augmented copy
         initial_value = tf.image.resize(
-            augmented_samples[0], self.output_size)[tf.newaxis, :]
+            augmented_copies[0], self.output_size)[tf.newaxis, :]
         target_image = tf.Variable(initial_value, name="Target_Image")
 
         trainable_vars = [target_image]
@@ -112,13 +112,12 @@ class Superresolution:
         n_drop = int(self.num_aug * self.copy_dropout)
 
         for i in range(self.num_iter):
-            # optimizer.minimize(lambda: self.loss_function(target_image, augmented_samples), var_list=[target_image])
             if optimizer.lr_scheduler:
                 optimizer.lr_decay(i)
 
             with tf.GradientTape() as tape:
                 loss = self.loss_function(
-                    target_image, augmented_samples, angles, shifts, n_drop=n_drop)
+                    target_image, augmented_copies, angles, shifts, n_drop=n_drop)
 
                 if self.verbose and (i % 10 == 0 or i == self.num_iter - 1):
                     print(f"{i + 1}/{self.num_iter} -- loss = {loss}")
@@ -126,4 +125,28 @@ class Superresolution:
             gradients = tape.gradient(loss, trainable_vars)
             optimizer.optimizer.apply_gradients(zip(gradients, trainable_vars))
 
-        return target_image, loss
+        return target_image[0].numpy(), loss
+
+    def max_superresolution(self, augmented_copies, angles, shifts):
+        augmented_copies_upsampled = tf.image.resize(
+            augmented_copies, size=self.output_size)
+        augmented_copies_translated = tfa.image.translate(augmented_copies_upsampled,
+                                                          -shifts,
+                                                          interpolation="BILINEAR")
+        augmented_copies_rotated = tfa.image.rotate(augmented_copies_translated,
+                                                    -angles,
+                                                    interpolation="BILINEAR")
+
+        return tf.reduce_max(augmented_copies_rotated, axis=0)
+
+    def mean_superresolution(self, augmented_copies, angles, shifts):
+        augmented_copies_upsampled = tf.image.resize(
+            augmented_copies, size=self.output_size)
+        augmented_copies_translated = tfa.image.translate(augmented_copies_upsampled,
+                                                          -shifts,
+                                                          interpolation="BILINEAR")
+        augmented_copies_rotated = tfa.image.rotate(augmented_copies_translated,
+                                                    -angles,
+                                                    interpolation="BILINEAR")
+
+        return tf.reduce_mean(augmented_copies_rotated, axis=0)

@@ -1,5 +1,5 @@
 entity: albergoni-nicolo
-project: Argmax low iterations
+project: Testing no LR scheduler
 program: sweep_script.py
 method: bayes
 metric:
@@ -21,29 +21,34 @@ parameters:
     min: 0.0
     distribution: uniform
   num_iter:
-    value: 150 
+    min: 100
+    max: 1000
+    distribution: q_uniform
+    q: 100
   optimizer:
     value: adam
   lr_scheduler:
-    value: True
+    value: False
   decay_rate:
-    value: 0.6
+    max: 0.9
+    min: 0.0
+    distribution: q_uniform
+    q: 0.1
   decay_steps:
     value: 50
   learning_rate:
     values:
-      - 1e-1
+      - 1e-4
       - 1e-2
-      - 1e-3     
+      - 1e-3
+      - 1e-1     
   copy_dropout:
     max: 0.9
     min: 0.0
     distribution: q_uniform
     q: 0.1
   use_BTV:
-    values:
-      - True
-      - False    
+    value: True   
 #command:
 #- ${env}
 #- C:\Users\alber\Desktop\DeepLabV3Plus-Augmented-SuperResolution\venv\Scripts\python.exe
