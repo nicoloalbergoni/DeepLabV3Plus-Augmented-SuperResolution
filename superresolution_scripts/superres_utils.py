@@ -4,6 +4,8 @@ import numpy as np
 from scipy.fftpack import shift
 import tensorflow as tf
 from matplotlib import pyplot as plt
+from superresolution_scripts.optimizer import Optimizer
+from superresolution_scripts.superresolution import Superresolution
 from utils import load_image
 
 
@@ -243,36 +245,46 @@ def load_SR_data(filepath, num_aug=100, mode_slice=True, global_normalize=True):
     return class_masks, max_masks, angles, shifts, filename
 
 
-def compute_augmented_SR(superresolution_obj, optimizer_obj, class_masks, angles, shifts, filename,
-                         max_masks=None, save_output=False, class_id=8, dest_folder=None):
+def compute_SR(superresolution_obj: Superresolution, class_masks, angles, shifts, filename, dest_folder,
+               SR_type="aug", max_masks=None, save_output=False, class_id=8):
     """
-    Computes the Augmented SR.
+    Computes the SR problem.
 
     Args:
         superresolution_obj (Superresolution): The Superresolution class object
-        optimizer_obj (Optimizer): The Optimizer class object
         class_masks (Tensor): The array of class (LR) images
         angles (ndarray): The arry of angles used in the augmentaion process
         shifts (ndarray): The arry of shifts used in the augmentaion process
         filename (str): The filename asscociated with the image
+        SR_type (str): One of 'aug', 'mean', 'max'. Defines the type of SR
         max_masks (Tensor, optional): Used in slice mode. It's the array of the max images. Defaults to None.
         save_output (bool, optional): Store the intermediate class/max HR images. Defaults to False.
         class_id (int, optional): class id of the selected class. Defaults to 8.
-        dest_folder (Path, optional): Path to store the final target image. Defaults to None.
+        dest_folder (Path, optional): Path to store the final target image.
 
     Returns:
         ndarray: The final HR image
     """
 
-    if not os.path.exists(dest_folder):
-        os.makedirs(dest_folder)
+    assert(SR_type in ["aug", "mean", "max"],
+           "SR_type must be either 'aug', 'mean' or 'max'")
 
-    target_image_class, _ = superresolution_obj.augmented_superresolution(optimizer_obj,
-                                                                          class_masks, angles, shifts)
+    out_folder = os.path.join(dest_folder, f"{SR_type}_SR")
+
+    if not os.path.exists(out_folder):
+        os.makedirs(out_folder)
+
+    if SR_type == "aug":
+        SR_function = superresolution_obj.augmented_superresolution
+    elif SR_type == "mean":
+        SR_function = superresolution_obj.mean_superresolution
+    elif SR_type == "max":
+        SR_function = superresolution_obj.max_superresolution
+
+    target_image_class, _ = SR_function(class_masks, angles, shifts)
 
     if max_masks is not None:
-        target_image_max, _ = superresolution_obj.augmented_superresolution(optimizer_obj,
-                                                                            max_masks, angles, shifts)
+        target_image_max, _ = SR_function(max_masks, angles, shifts)
         th_mask = threshold_image(
             target_image_class, class_id, th_mask=target_image_max)
 
@@ -281,25 +293,24 @@ def compute_augmented_SR(superresolution_obj, optimizer_obj, class_masks, angles
 
     if save_output:
         tf.keras.utils.save_img(
-            f"{dest_folder}/{filename}_class.png", target_image_class, scale=True)
+            f"{out_folder}/{filename}_class.png", target_image_class, scale=True)
         if max_masks is not None:
             tf.keras.utils.save_img(
-                f"{dest_folder}/{filename}_max.png", target_image_max, scale=True)
+                f"{out_folder}/{filename}_max.png", target_image_max, scale=True)
 
     tf.keras.utils.save_img(
-        f"{dest_folder}/{filename}_SR.png", th_mask, scale=True)
+        f"{out_folder}/{filename}_SR.png", th_mask, scale=True)
 
     return th_mask
 
 
-def compare_results(true_image, standard_image, superres_image, img_size=(512, 512), class_id=8):
+def compute_IoU(true_image, image, img_size=(512, 512), class_id=8):
     """
-    Compute the IoU between the GT image, the standard image (obtained with bilinear upsampling) and the superresolution image.
+    Compute the IoU between the true image and the given imge.
 
     Args:
         true_image (Tensor): Ground Truth image HR
-        standard_image (Tensor): HR image obtain with bilinear upsample
-        superres_image (Tensor): HR image obtained with Augmented SR
+        image (Tensor): Given image
         img_size (tuple, optional): HR image size. Defaults to (512, 512).
         class_id (int, optional): id of the choosen class. Defaults to 8.
 
@@ -307,12 +318,8 @@ def compare_results(true_image, standard_image, superres_image, img_size=(512, 5
         float, float: The IoUs of the standard and superresolution images
     """
     true_image = tf.reshape(true_image, (img_size[0] * img_size[1], 1))
-    standard_image = tf.reshape(standard_image, (img_size[0] * img_size[1], 1))
-    superres_image = tf.reshape(superres_image, (img_size[0] * img_size[1], 1))
+    image = tf.reshape(image, (img_size[0] * img_size[1], 1))
 
-    standard_IOU = single_class_IOU(
-        true_image, standard_image, class_id=class_id)
-    superres_IOU = single_class_IOU(
-        true_image, superres_image, class_id=class_id)
+    iou = single_class_IOU(true_image, image, class_id=class_id)
 
-    return standard_IOU.numpy(), superres_IOU.numpy()
+    return iou.numpy()

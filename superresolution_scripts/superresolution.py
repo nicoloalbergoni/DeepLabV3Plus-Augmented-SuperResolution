@@ -24,7 +24,7 @@ def bilateral_tv(target_image, alpha=0.6, shift_factor=3):
 
 
 class Superresolution:
-    def __init__(self, lambda_df, lambda_tv, lambda_L2, lambda_L1, num_iter=200, num_aug=100,
+    def __init__(self, lambda_df, lambda_tv, lambda_L2, lambda_L1, num_iter=200, num_aug=100, optimizer: Optimizer = None,
                  feature_size=(64, 64), output_size=(512, 512),  use_BTV=False, verbose=False, copy_dropout=0.0):
 
         self.lambda_df = lambda_df
@@ -34,6 +34,7 @@ class Superresolution:
 
         self.num_iter = num_iter
         self.num_aug = num_aug
+        self.optimizer = optimizer
         self.feature_size = feature_size
         self.output_size = output_size
         self.use_BTV = use_BTV
@@ -98,7 +99,12 @@ class Superresolution:
 
         return loss
 
-    def augmented_superresolution(self, optimizer: Optimizer, augmented_copies, angles, shifts):
+    def augmented_superresolution(self, augmented_copies, angles, shifts):
+
+        if self.optimizer is None:
+            raise Exception(
+                "You must provide an instance of the Optimizer class to compute the augmented SR")
+
         # Variable for the target output image
         # target_image = tf.Variable(tf.zeros([1, self.output_size[0], self.output_size[1], 1]), name="Target_Image")
 
@@ -112,8 +118,8 @@ class Superresolution:
         n_drop = int(self.num_aug * self.copy_dropout)
 
         for i in range(self.num_iter):
-            if optimizer.lr_scheduler:
-                optimizer.lr_decay(i)
+            if self.optimizer.lr_scheduler:
+                self.optimizer.lr_decay(i)
 
             with tf.GradientTape() as tape:
                 loss = self.loss_function(
@@ -123,7 +129,8 @@ class Superresolution:
                     print(f"{i + 1}/{self.num_iter} -- loss = {loss}")
 
             gradients = tape.gradient(loss, trainable_vars)
-            optimizer.optimizer.apply_gradients(zip(gradients, trainable_vars))
+            self.optimizer.optimizer.apply_gradients(
+                zip(gradients, trainable_vars))
 
         return target_image[0].numpy(), loss
 
@@ -137,7 +144,7 @@ class Superresolution:
                                                     -angles,
                                                     interpolation="BILINEAR")
 
-        return tf.reduce_max(augmented_copies_rotated, axis=0)
+        return tf.reduce_max(augmented_copies_rotated, axis=0).numpy(), None
 
     def mean_superresolution(self, augmented_copies, angles, shifts):
         augmented_copies_upsampled = tf.image.resize(
@@ -149,4 +156,4 @@ class Superresolution:
                                                     -angles,
                                                     interpolation="BILINEAR")
 
-        return tf.reduce_mean(augmented_copies_rotated, axis=0)
+        return tf.reduce_mean(augmented_copies_rotated, axis=0).numpy(), None

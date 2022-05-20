@@ -48,12 +48,12 @@ def generate_augmented_copies(original_image, angle_max, shift_max, num_aug=100,
     return translated_images, angles, shifts
 
 
-def test_aug_params(original_image, superres_obj: Superresolution, optimizer_obj: Optimizer, dest_folder):
+def test_aug_params(original_image, superres_obj: Superresolution, dest_folder):
 
     if not os.path.exists(dest_folder):
         os.makedirs(dest_folder)
 
-    angle_max_range = np.arange(0.0, 2.1, step=0.1)
+    angle_max_range = np.arange(0.0, 3.2, step=0.1)
     # shift_max_range = np.arange(0, 60, step=10)
     shift_max_range = np.full((1), 0)
     angle_shift_permutations = [(a, s)
@@ -64,8 +64,8 @@ def test_aug_params(original_image, superres_obj: Superresolution, optimizer_obj
         augmented_copies, angles, shifts = generate_augmented_copies(
             original_image, angle_max=angle_max, shift_max=0, num_aug=NUM_AUG)
 
-        target_image, loss = superres_obj.augmented_superresolution(optimizer_obj,
-                                                                    augmented_copies, angles, shifts)
+        target_image, loss = superres_obj.augmented_superresolution(
+            augmented_copies, angles, shifts)
 
         # original_image = original_image.numpy()
 
@@ -88,12 +88,14 @@ def test_aug_params(original_image, superres_obj: Superresolution, optimizer_obj
 def main():
 
     coeff_dict = {
-        "lambda_tv": 9.0,
+        "lambda_tv": 0.2,
         "lambda_L2": 0.01,
-        "lambda_L1": 2,
+        "lambda_L1": 0.01,
     }
 
     coeff_dict = normalize_coefficients(coeff_dict)
+
+    print(coeff_dict)
 
     superres_params = {
         "lambda_df": 1.0,
@@ -109,7 +111,7 @@ def main():
         "epsilon": 1e-7,
         "beta_1": 0.9,
         "beta_2": 0.999,
-        "amsgrad": True,
+        "amsgrad": False,
         "initial_accumulator_value": 0.1,
         "momentum": 0.2,
         "nesterov": True,
@@ -118,15 +120,15 @@ def main():
         "decay_steps": 50
     }
 
-    optimizer = Optimizer(**optimizer_config)
+    optimizer_obj = Optimizer(**optimizer_config)
 
-    superres_obj = Superresolution(**superres_params, **coeff_dict)
+    superres_obj = Superresolution(
+        **superres_params, **coeff_dict, optimizer=optimizer_obj)
     image_path = os.path.join(IMAGE_FOLDER, "test_image.png")
     original_image = load_image(image_path, normalize=True, is_png=True)
     original_image = original_image.numpy()
 
-    df = test_aug_params(original_image, superres_obj,
-                         optimizer, SR_OUTPUT_FOLDER)
+    df = test_aug_params(original_image, superres_obj, SR_OUTPUT_FOLDER)
     print(df)
     print(df.loc[df['PSNR'].idxmax()])
 
