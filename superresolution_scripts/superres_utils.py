@@ -1,5 +1,7 @@
 import os
+import h5py
 import numpy as np
+from scipy.fftpack import shift
 import tensorflow as tf
 from matplotlib import pyplot as plt
 from utils import load_image
@@ -102,27 +104,6 @@ def get_precomputed_folders_path(root_dir, num_aug=100):
     return valid_folders
 
 
-def plot_image(image):
-    plt.figure(figsize=(20, 20))
-    plt.imshow(tf.keras.preprocessing.image.array_to_img(image))
-    plt.axis('off')
-    plt.show()
-
-
-def plot_histogram(image):
-    plt.figure(figsize=(18, 18))
-    vals = image.flatten()
-    b, bins, patches = plt.hist(vals, 255)
-    plt.show()
-
-
-def print_labels(masks):
-    title = ["Standard Labels: ", "Superres Labels: "]
-    for i in range(2):
-        values, count = np.unique(masks[i], return_counts=True)
-        print(title[i] + str(dict(zip(values, count))))
-
-
 def list_precomputed_data_paths(root_dir, sort=False):
     paths = []
 
@@ -205,3 +186,133 @@ def normalize_coefficients(coeff_dict):
                 for (key, value) in coeff_dict.items()}
 
     return new_dict
+
+
+def load_SR_data(filepath, num_aug=100, mode_slice=True, global_normalize=True):
+    """
+    Load and unpacks a hdf5 file that contains the data for the super-resolution problem
+
+    Args:
+        filepath (str): the full path to the hdf5 file
+        num_aug (int, optional): The (minimum) length of each image array in the file. 
+            Used to check the file validity. Defaults to 100.
+        mode_slice (bool, optional): Toggle between slice mode and argmax mode. Defaults to True.
+        global_normalize (bool, optional): Whether to normalize the images with respect to the global max/min from all image array. Defaults to True.
+
+    Raises:
+        Exception: File does not contain enough images 
+
+    Returns:
+        Alla the data stored in the file: class_masks, max_masks (if slice mode None otherwise), angles, shifts, filename.
+    """
+    file = h5py.File(f"{filepath}", "r")
+
+    if not check_hdf5_validity(file, num_aug=num_aug):
+        file.close()
+        raise Exception(f"File: {filepath} is invalid")
+
+    filename = file.attrs["filename"]
+    angles = file["angles"][:num_aug]
+    shifts = file["shifts"][:num_aug]
+
+    class_masks = file["class_masks"][:num_aug]
+    class_masks = tf.stack(class_masks)
+
+    global_min, global_max = (tf.reduce_min(class_masks), tf.reduce_max(class_masks)) if global_normalize else (
+        None, None)
+
+    class_masks = tf.map_fn(
+        fn=lambda image: min_max_normalization(image.numpy(), new_min=0.0, new_max=1.0, global_min=global_min,
+                                               global_max=global_max), elems=class_masks)
+
+    max_masks = None
+
+    if mode_slice:
+        max_masks = file["max_masks"][:num_aug]
+        max_masks = tf.stack(max_masks)
+
+        global_min, global_max = (tf.reduce_min(max_masks), tf.reduce_max(max_masks)) if global_normalize else (
+            None, None)
+
+        max_masks = tf.map_fn(
+            fn=lambda image: min_max_normalization(image.numpy(), new_min=0.0, new_max=1.0, global_min=global_min,
+                                                   global_max=global_max), elems=max_masks)
+
+    file.close()
+
+    return class_masks, max_masks, angles, shifts, filename
+
+
+def compute_augmented_SR(superresolution_obj, optimizer_obj, class_masks, angles, shifts, filename,
+                         max_masks=None, save_output=False, class_id=8, dest_folder=None):
+    """
+    Computes the Augmented SR.
+
+    Args:
+        superresolution_obj (Superresolution): The Superresolution class object
+        optimizer_obj (Optimizer): The Optimizer class object
+        class_masks (Tensor): The array of class (LR) images
+        angles (ndarray): The arry of angles used in the augmentaion process
+        shifts (ndarray): The arry of shifts used in the augmentaion process
+        filename (str): The filename asscociated with the image
+        max_masks (Tensor, optional): Used in slice mode. It's the array of the max images. Defaults to None.
+        save_output (bool, optional): Store the intermediate class/max HR images. Defaults to False.
+        class_id (int, optional): class id of the selected class. Defaults to 8.
+        dest_folder (Path, optional): Path to store the final target image. Defaults to None.
+
+    Returns:
+        ndarray: The final HR image
+    """
+
+    if not os.path.exists(dest_folder):
+        os.makedirs(dest_folder)
+
+    target_image_class, _ = superresolution_obj.augmented_superresolution(optimizer_obj,
+                                                                          class_masks, angles, shifts)
+
+    if max_masks is not None:
+        target_image_max, _ = superresolution_obj.augmented_superresolution(optimizer_obj,
+                                                                            max_masks, angles, shifts)
+        th_mask = threshold_image(
+            target_image_class, class_id, th_mask=target_image_max)
+
+    else:
+        th_mask = threshold_image(target_image_class, class_id, th_factor=.15)
+
+    if save_output:
+        tf.keras.utils.save_img(
+            f"{dest_folder}/{filename}_class.png", target_image_class, scale=True)
+        if max_masks is not None:
+            tf.keras.utils.save_img(
+                f"{dest_folder}/{filename}_max.png", target_image_max, scale=True)
+
+    tf.keras.utils.save_img(
+        f"{dest_folder}/{filename}_SR.png", th_mask, scale=True)
+
+    return th_mask
+
+
+def compare_results(true_image, standard_image, superres_image, img_size=(512, 512), class_id=8):
+    """
+    Compute the IoU between the GT image, the standard image (obtained with bilinear upsampling) and the superresolution image.
+
+    Args:
+        true_image (Tensor): Ground Truth image HR
+        standard_image (Tensor): HR image obtain with bilinear upsample
+        superres_image (Tensor): HR image obtained with Augmented SR
+        img_size (tuple, optional): HR image size. Defaults to (512, 512).
+        class_id (int, optional): id of the choosen class. Defaults to 8.
+
+    Returns:
+        float, float: The IoUs of the standard and superresolution images
+    """
+    true_image = tf.reshape(true_image, (img_size[0] * img_size[1], 1))
+    standard_image = tf.reshape(standard_image, (img_size[0] * img_size[1], 1))
+    superres_image = tf.reshape(superres_image, (img_size[0] * img_size[1], 1))
+
+    standard_IOU = single_class_IOU(
+        true_image, standard_image, class_id=class_id)
+    superres_IOU = single_class_IOU(
+        true_image, superres_image, class_id=class_id)
+
+    return standard_IOU.numpy(), superres_IOU.numpy()

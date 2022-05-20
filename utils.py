@@ -61,8 +61,8 @@ def sparse_accuracy_ignoring_last_label(y_true, y_pred):
 
 
 def sparse_Mean_IOU(y_true, y_pred):
-    #tf.print(K.shape(y_true))
-    #tf.print(K.shape(y_pred))
+    # tf.print(K.shape(y_true))
+    # tf.print(K.shape(y_pred))
     nb_classes = (y_pred.shape.as_list())[-1]
     iou = []
     pred_pixels = tf.argmax(y_pred, axis=-1)
@@ -74,9 +74,9 @@ def sparse_Mean_IOU(y_true, y_pred):
         union = tf.cast(true_labels | pred_labels, tf.int32)
         legal_batches = tf.reduce_sum(
             tf.cast(true_labels, tf.int32), axis=1) > 0  # check if the current class is present in the image
-        #tf.print(K.shape(legal_batches))
+        # tf.print(K.shape(legal_batches))
         ious = tf.reduce_sum(inter, axis=1) / tf.reduce_sum(union, axis=1)
-        #tf.print(K.shape(ious))
+        # tf.print(K.shape(ious))
         # returns average IoU of the same objects
         iou.append(tf.reduce_mean(
             tf.gather(ious, indices=tf.where(legal_batches))))
@@ -123,6 +123,22 @@ def get_prediction(model, input_image):
     return mask
 
 
+def plot_image(image):
+    plt.figure(figsize=(20, 20))
+    plt.imshow(tf.keras.preprocessing.image.array_to_img(image))
+    plt.axis('off')
+    plt.show()
 
 
+def plot_histogram(image):
+    plt.figure(figsize=(18, 18))
+    vals = image.flatten()
+    b, bins, patches = plt.hist(vals, 255)
+    plt.show()
 
+
+def print_labels(masks):
+    title = ["Standard Labels: ", "Superres Labels: "]
+    for i in range(2):
+        values, count = np.unique(masks[i], return_counts=True)
+        print(title[i] + str(dict(zip(values, count))))

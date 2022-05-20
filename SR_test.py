@@ -10,7 +10,7 @@ from superresolution_scripts.superresolution import Superresolution
 from superresolution_scripts.optimizer import Optimizer
 from superresolution_scripts.superres_utils import min_max_normalization, normalize_coefficients
 
-# os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+# os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 SEED = 1234
 
@@ -25,6 +25,7 @@ SHIFT_MAX = 30
 
 DATA_DIR = os.path.join(os.getcwd(), "data")
 IMAGE_FOLDER = os.path.join(DATA_DIR, "test_images")
+SR_OUTPUT_FOLDER = os.path.join(IMAGE_FOLDER, "SR_Output")
 
 
 def generate_augmented_copies(original_image, angle_max, shift_max, num_aug=100, copies_size=(64, 64)):
@@ -47,26 +48,29 @@ def generate_augmented_copies(original_image, angle_max, shift_max, num_aug=100,
     return translated_images, angles, shifts
 
 
-def test_aug_params(original_image, superres_obj: Superresolution, optimizer_obj: Optimizer):
+def test_aug_params(original_image, superres_obj: Superresolution, optimizer_obj: Optimizer, dest_folder):
 
-    angle_max_range = np.arange(0.0, 1.0, step=0.1)
-    shift_max_range = np.arange(0, 60, step=10)
+    if not os.path.exists(dest_folder):
+        os.makedirs(dest_folder)
+
+    angle_max_range = np.arange(0.0, 2.1, step=0.1)
+    # shift_max_range = np.arange(0, 60, step=10)
+    shift_max_range = np.full((1), 0)
     angle_shift_permutations = [(a, s)
                                 for a in angle_max_range for s in shift_max_range]
     data_list = []
 
     for i, (angle_max, shift_max) in tqdm(enumerate(angle_shift_permutations)):
         augmented_copies, angles, shifts = generate_augmented_copies(
-            original_image, angle_max=angle_max, shift_max=shift_max, num_aug=NUM_AUG)
+            original_image, angle_max=angle_max, shift_max=0, num_aug=NUM_AUG)
 
         target_image, loss = superres_obj.augmented_superresolution(optimizer_obj,
                                                                     augmented_copies, angles, shifts)
 
-        target_image = target_image[0].numpy()
         # original_image = original_image.numpy()
 
         tf.keras.utils.save_img(
-            f"{IMAGE_FOLDER}/test_image_{i}_SR.png", target_image, scale=True)
+            f"{dest_folder}/test_image_{i}_SR.png", target_image, scale=True)
 
         # mse = tf.keras.metrics.mean_squared_error(original_image, target_image)
         mse = mean_squared_error(original_image, target_image)
@@ -84,16 +88,16 @@ def test_aug_params(original_image, superres_obj: Superresolution, optimizer_obj
 def main():
 
     coeff_dict = {
-        "lambda_tv": 0.2,
+        "lambda_tv": 9.0,
         "lambda_L2": 0.01,
-        "lambda_L1": 0.00,
+        "lambda_L1": 2,
     }
 
     coeff_dict = normalize_coefficients(coeff_dict)
 
     superres_params = {
         "lambda_df": 1.0,
-        "num_iter": 200,
+        "num_iter": 300,
         "num_aug": NUM_AUG,
         "use_BTV": False,
         "copy_dropout": 0.0
@@ -121,7 +125,8 @@ def main():
     original_image = load_image(image_path, normalize=True, is_png=True)
     original_image = original_image.numpy()
 
-    df = test_aug_params(original_image, superres_obj, optimizer)
+    df = test_aug_params(original_image, superres_obj,
+                         optimizer, SR_OUTPUT_FOLDER)
     print(df)
     print(df.loc[df['PSNR'].idxmax()])
 
