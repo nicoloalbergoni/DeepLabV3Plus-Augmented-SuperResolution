@@ -1,5 +1,6 @@
 import os
 import h5py
+import argparse
 import numpy as np
 from tqdm import tqdm
 import tensorflow as tf
@@ -8,6 +9,25 @@ import tensorflow_addons as tfa
 from utils import load_image, get_prediction, create_mask
 from superresolution_scripts.superres_utils import get_img_paths, load_images
 
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--num_aug", help="Number of augmented copies created for each image",
+                    action="store", type=int, default=100)
+parser.add_argument(
+    "--num_samples", help="Number of samples taken from the dataset", action="store", type=int, default=500)
+
+parser.add_argument(
+    "--mode_slice", help="Whether to operate in slicing or argmax mode", action="store_true")
+
+parser.add_argument("--angle_max", help="Max angle value (in radians) used for rotations", action="store",
+                    type=float, default=0.3)
+
+parser.add_argument("--shift_max", help="Max shift value used for traslations", action="store",
+                    type=int, default=30)
+
+args = parser.parse_args()
+
+
 SEED = 1234
 
 np.random.seed(SEED)
@@ -15,10 +35,12 @@ tf.random.set_seed(SEED)
 
 IMG_SIZE = (512, 512)
 BATCH_SIZE = 8
-NUM_AUG = 100
+NUM_AUG = args.num_aug
 CLASS_ID = 8
-NUM_SAMPLES = 500
-MODE_SLICE = True
+NUM_SAMPLES = args.num_samples
+ANGLE_MAX = args.angle_max
+SHIFT_MAX = args.shift_max
+MODE_SLICE = args.mode_slice
 USE_VALIDATION = False
 
 DATA_DIR = os.path.join(os.getcwd(), "data")
@@ -26,8 +48,9 @@ PASCAL_ROOT = os.path.join(DATA_DIR, "dataset_root", "VOCdevkit", "VOC2012")
 IMGS_PATH = os.path.join(PASCAL_ROOT, "JPEGImages")
 
 SUPERRES_ROOT = os.path.join(DATA_DIR, "superres_root")
-PRECOMPUTED_OUTPUT_DIR = os.path.join(SUPERRES_ROOT,
-                                      f"precomputed_features_{'slice' if MODE_SLICE else 'argmax'}{'_validation' if USE_VALIDATION else ''}")
+AUGMENTED_COPIES_ROOT = os.path.join(SUPERRES_ROOT, "augmented_copies")
+AUGMENTED_COPIES_OUTPUT_DIR = os.path.join(AUGMENTED_COPIES_ROOT,
+                                           f"{'slice' if MODE_SLICE else 'argmax'}_{NUM_AUG}{'_validation' if USE_VALIDATION else ''}")
 STANDARD_OUTPUT_DIR = os.path.join(
     SUPERRES_ROOT, f"standard_output{'_validation' if USE_VALIDATION else ''}")
 
@@ -170,6 +193,8 @@ def compute_augmented_features(image_filenames, model, dest_folder, filter_class
         file.create_dataset("shifts", data=shifts)
         file.attrs["filename"] = filename
         file.attrs["mode"] = "slice" if mode_slice else "argmax"
+        file.attrs["angle_max"] = angle_max
+        file.attrs["shift_max"] = shift_max
 
         file.close()
 
@@ -211,13 +236,10 @@ def main():
     compute_standard_output(images_dict, model_standard, dest_folder=STANDARD_OUTPUT_DIR,
                             filter_class_id=CLASS_ID)
 
-    angle_max = 0.5  # in radians
-    shift_max = 30
-
     print("Generating augmented copies...")
     compute_augmented_features(images_dict, model_no_upsample, mode_slice=MODE_SLICE,
-                               dest_folder=PRECOMPUTED_OUTPUT_DIR, filter_class_id=CLASS_ID,
-                               num_aug=NUM_AUG, angle_max=angle_max, shift_max=shift_max,
+                               dest_folder=AUGMENTED_COPIES_OUTPUT_DIR, filter_class_id=CLASS_ID,
+                               num_aug=NUM_AUG, angle_max=ANGLE_MAX, shift_max=SHIFT_MAX,
                                save_output=False, relu_output=False)
 
 

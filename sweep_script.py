@@ -9,7 +9,7 @@ from utils import load_image
 from superresolution_scripts.superres_utils import compute_IoU, \
     list_precomputed_data_paths, load_SR_data, compute_SR, normalize_coefficients
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 SEED = 1234
 
@@ -21,8 +21,8 @@ tf.random.set_seed(SEED)
 IMG_SIZE = (512, 512)
 NUM_AUG = 100
 CLASS_ID = 8
-NUM_SAMPLES = 100
-MODE_SLICE = True
+NUM_SAMPLES = 500
+MODE_SLICE = False
 USE_VALIDATION = False
 
 DATA_DIR = os.path.join(os.getcwd(), "data")
@@ -30,8 +30,9 @@ PASCAL_ROOT = os.path.join(DATA_DIR, "dataset_root", "VOCdevkit", "VOC2012")
 IMGS_PATH = os.path.join(PASCAL_ROOT, "JPEGImages")
 
 SUPERRES_ROOT = os.path.join(DATA_DIR, "superres_root")
+AUGMENTED_COPIES_ROOT = os.path.join(SUPERRES_ROOT, "augmented_copies")
 PRECOMPUTED_OUTPUT_DIR = os.path.join(
-    SUPERRES_ROOT, f"precomputed_features_{'slice' if MODE_SLICE else 'argmax'}{'_validation' if USE_VALIDATION else ''}")
+    AUGMENTED_COPIES_ROOT, f"{'slice' if MODE_SLICE else 'argmax'}_{NUM_AUG}{'_validation' if USE_VALIDATION else ''}")
 STANDARD_OUTPUT_DIR = os.path.join(
     SUPERRES_ROOT, f"standard_output{'_validation' if USE_VALIDATION else ''}")
 SUPERRES_OUTPUT_DIR = os.path.join(
@@ -104,9 +105,6 @@ def main():
             print(f"File: {filepath} is invalid, skipping...")
             continue
 
-        target_augmented_SR = compute_SR(superresolution_obj, class_masks, angles, shifts, filename, max_masks=max_masks, SR_type="aug",
-                                         save_output=False, class_id=CLASS_ID, dest_folder=SUPERRES_OUTPUT_DIR)
-
         true_mask_path = os.path.join(
             PASCAL_ROOT, "SegmentationClassAug", f"{filename}.png")
         true_mask = load_image(true_mask_path, image_size=IMG_SIZE, normalize=False,
@@ -117,23 +115,45 @@ def main():
         standard_mask = load_image(standard_mask_path, image_size=IMG_SIZE, normalize=False, is_png=True,
                                    resize_method="nearest")
 
+        target_augmented_SR = compute_SR(superresolution_obj, class_masks, angles, shifts, filename, max_masks=max_masks, SR_type="aug",
+                                         save_output=False, class_id=CLASS_ID, dest_folder=SUPERRES_OUTPUT_DIR)
+        target_max_SR = compute_SR(superresolution_obj, class_masks, angles, shifts, filename, max_masks=max_masks, SR_type="max",
+                                   save_output=False, class_id=CLASS_ID, dest_folder=SUPERRES_OUTPUT_DIR)
+        target_mean_SR = compute_SR(superresolution_obj, class_masks, angles, shifts, filename, max_masks=max_masks, SR_type="mean",
+                                    save_output=False, class_id=CLASS_ID, dest_folder=SUPERRES_OUTPUT_DIR)
+
         standard_iou = compute_IoU(
             true_mask, standard_mask, img_size=IMG_SIZE, class_id=CLASS_ID)
 
         augmented_SR_iou = compute_IoU(
             true_mask, target_augmented_SR, img_size=IMG_SIZE, class_id=CLASS_ID)
 
+        max_SR_iou = compute_IoU(
+            true_mask, target_max_SR, img_size=IMG_SIZE, class_id=CLASS_ID)
+
+        mean_SR_iou = compute_IoU(
+            true_mask, target_mean_SR, img_size=IMG_SIZE, class_id=CLASS_ID)
+
         standard_ious.append(standard_iou)
         augmented_SR_ious.append(augmented_SR_iou)
+        max_SR_ious.append(max_SR_iou)
+        mean_SR_ious.append(mean_SR_iou)
 
     avg_standard_iou = np.mean(standard_ious)
     avg_augmented_SR_iou = np.mean(augmented_SR_ious)
+    avg_max_SR_iou = np.mean(max_SR_ious)
+    avg_mean_SR_iou = np.mean(mean_SR_ious)
 
     print(
         f"Avg. Standard IoUs: {avg_standard_iou},  Avg. Augmented SR IoUs: {avg_augmented_SR_iou}")
 
-    wandb.log({"mean_superres_iou": avg_augmented_SR_iou,
-               "mean_standard_iou": avg_standard_iou})
+    print(
+        f"Avg. Max SR IoUs: {avg_max_SR_iou}, Avg. Mean SR IoUs: {avg_mean_SR_iou}")
+
+    wandb.log({"avg_aug_SR_iou": avg_augmented_SR_iou,
+               "avg_standard_iou": avg_standard_iou,
+               "avg_max_SR_iou": avg_max_SR_iou,
+               "avg_mean_SR_iou": avg_mean_SR_iou})
 
 
 if __name__ == '__main__':

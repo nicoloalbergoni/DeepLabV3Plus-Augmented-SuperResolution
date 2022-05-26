@@ -30,8 +30,9 @@ PASCAL_ROOT = os.path.join(DATA_DIR, "dataset_root", "VOCdevkit", "VOC2012")
 IMGS_PATH = os.path.join(PASCAL_ROOT, "JPEGImages")
 
 SUPERRES_ROOT = os.path.join(DATA_DIR, "superres_root")
+AUGMENTED_COPIES_ROOT = os.path.join(SUPERRES_ROOT, "augmented_copies")
 PRECOMPUTED_OUTPUT_DIR = os.path.join(
-    SUPERRES_ROOT, f"precomputed_features_{'slice' if MODE_SLICE else 'argmax'}{'_validation' if USE_VALIDATION else ''}")
+    AUGMENTED_COPIES_ROOT, f"{'slice' if MODE_SLICE else 'argmax'}_{NUM_AUG}{'_validation' if USE_VALIDATION else ''}")
 STANDARD_OUTPUT_DIR = os.path.join(
     SUPERRES_ROOT, f"standard_output{'_validation' if USE_VALIDATION else ''}")
 SUPERRES_OUTPUT_DIR = os.path.join(
@@ -107,9 +108,6 @@ def main():
             print(f"File: {filepath} is invalid, skipping...")
             continue
 
-        target_augmented_SR = compute_SR(superresolution_obj, class_masks, angles, shifts, filename, max_masks=max_masks, SR_type="aug",
-                                         save_output=False, class_id=CLASS_ID, dest_folder=SUPERRES_OUTPUT_DIR)
-
         true_mask_path = os.path.join(
             PASCAL_ROOT, "SegmentationClassAug", f"{filename}.png")
         true_mask = load_image(true_mask_path, image_size=IMG_SIZE, normalize=False,
@@ -120,17 +118,20 @@ def main():
         standard_mask = load_image(standard_mask_path, image_size=IMG_SIZE, normalize=False, is_png=True,
                                    resize_method="nearest")
 
-        standard_iou = compute_IoU(
-            true_mask, standard_mask, img_size=IMG_SIZE, class_id=CLASS_ID)
-
-        augmented_SR_iou = compute_IoU(
-            true_mask, target_augmented_SR, img_size=IMG_SIZE, class_id=CLASS_ID)
+        target_augmented_SR = compute_SR(superresolution_obj, class_masks, angles, shifts, filename, max_masks=max_masks, SR_type="aug",
+                                         save_output=False, class_id=CLASS_ID, dest_folder=SUPERRES_OUTPUT_DIR)
 
         target_max_SR = compute_SR(superresolution_obj, class_masks, angles, shifts, filename, max_masks=max_masks, SR_type="max",
                                    save_output=False, class_id=CLASS_ID, dest_folder=SUPERRES_OUTPUT_DIR)
 
         target_mean_SR = compute_SR(superresolution_obj, class_masks, angles, shifts, filename, max_masks=max_masks, SR_type="mean",
                                     save_output=False, class_id=CLASS_ID, dest_folder=SUPERRES_OUTPUT_DIR)
+
+        standard_iou = compute_IoU(
+            true_mask, standard_mask, img_size=IMG_SIZE, class_id=CLASS_ID)
+
+        augmented_SR_iou = compute_IoU(
+            true_mask, target_augmented_SR, img_size=IMG_SIZE, class_id=CLASS_ID)
 
         max_SR_iou = compute_IoU(
             true_mask, target_max_SR, img_size=IMG_SIZE, class_id=CLASS_ID)
