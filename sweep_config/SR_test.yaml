@@ -1,10 +1,10 @@
 entity: albergoni-nicolo
-project: Argmax 500 samples 
-program: sweep_script.py
+project: Testing no normalization (Normal images)
+program: SR_test.py
 method: bayes
 metric:
-  goal: maximize
-  name: mean_superres_iou
+  goal: minimize
+  name: Avg_MSE_Aug
 parameters:
   lambda_df:
     value: 1.0
@@ -21,24 +21,46 @@ parameters:
     min: 0.0
     distribution: uniform
   num_iter:
-    value: 400
+    values:
+      - 100
+      - 200
+      - 300
+      - 400
   optimizer:
     value: adam
-  lr_scheduler:
-    value: True
+  # lr_scheduler:
+  #   value: True
   decay_rate:
-    value: 0.05
-  decay_steps:
-    value: 20
+    max: 0.9
+    min: 0.0
+    distribution: q_uniform
+    q: 0.05
+  # decay_steps:
+  #   value: 50
   learning_rate:
-    value: 1e-3     
+    values:
+      - 1e-2
+      - 1e-3  
   copy_dropout:
     max: 0.9
     min: 0.0
     distribution: q_uniform
     q: 0.1
   use_BTV:
-    value: False   
+    values:
+      - True
+      - False  
+  angle_max:
+    min: 0.0
+    max: 3.2
+    q: 0.1
+    distribution: q_uniform
+  shift_max:
+    min: 0
+    max: 30
+    q: 5
+    distribution: q_uniform
+
 #command:
 #- ${env}
 #- C:\Users\alber\Desktop\DeepLabV3Plus-Augmented-SuperResolution\venv\Scripts\python.exe

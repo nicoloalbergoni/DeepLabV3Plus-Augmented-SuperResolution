@@ -6,7 +6,7 @@ from superresolution_scripts.optimizer import Optimizer
 
 
 @tf.function
-def bilateral_tv(target_image, alpha=0.6, shift_factor=3):
+def bilateral_tv(target_image, alpha=0.4, shift_factor=3):
     h_shifts = np.arange(-shift_factor, shift_factor + 1, step=1)
     v_shifts = np.arange(0, shift_factor + 1, step=1)
     pairs = [[h, v] for h in h_shifts for v in v_shifts]
@@ -120,6 +120,8 @@ class Superresolution:
         for i in range(self.num_iter):
             if self.optimizer.lr_scheduler:
                 self.optimizer.lr_decay(i)
+
+            # print(self.optimizer.optimizer.learning_rate)
 
             with tf.GradientTape() as tape:
                 loss = self.loss_function(

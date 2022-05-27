@@ -32,7 +32,18 @@
       "justMyCode": true,
       "env": {
         "CUDA_VISIBLE_DEVICES": "0"
-      }
+      },
+      "args": [
+        "--num_aug",
+        "100",
+        "--num_samples",
+        "500",
+        "--mode_slice",
+        "--angle_max",
+        "0.15",
+        "--shift_max",
+        "0"
+      ]
     },
     {
       "name": "Download VOC",

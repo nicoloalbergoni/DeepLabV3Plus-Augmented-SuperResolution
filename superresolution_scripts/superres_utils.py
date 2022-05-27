@@ -299,7 +299,7 @@ def compute_SR(superresolution_obj: Superresolution, class_masks, angles, shifts
                 f"{out_folder}/{filename}_max.png", target_image_max, scale=True)
 
     tf.keras.utils.save_img(
-        f"{out_folder}/{filename}_SR.png", th_mask, scale=True)
+        f"{out_folder}/{filename}_{SR_type}_SR.png", th_mask, scale=True)
 
     return th_mask
 
