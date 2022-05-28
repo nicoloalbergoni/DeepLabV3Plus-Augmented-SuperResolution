@@ -12,6 +12,7 @@ WEIGHTS_PATH_MOBILE = "https://github.com/bonlime/keras-deeplab-v3-plus/releases
 DATA_DIR = os.path.join(os.getcwd(), "data")
 DEFAULT_WEIGHTS_FOLDER = os.path.join(DATA_DIR, "model_weights")
 
+
 class DeeplabV3Plus:
     def __init__(self, weights='pascal_voc', input_tensor=None, input_shape=(512, 512, 3), classes=21, OS=16,
                  last_activation=None, load_weights=True, reshape_outputs=False, backbone="xception", alpha=1.):
@@ -60,7 +61,7 @@ class DeeplabV3Plus:
 
         self.input_tensor = input_tensor
 
-    def build_model(self, only_DCNN_output=False, only_ASPP_output=False, first_upsample_size=(128, 128), final_upsample=True):
+    def build_model(self, only_DCNN_output=False, only_ASPP_output=False, first_upsample_size=(128, 128), final_upsample=True, final_class_prediction=True):
 
         if self.backbone == "xception" and only_DCNN_output is True and only_ASPP_output is True:
             raise ValueError("Both only_DCNN_output and only_ASPP_output cannot be True at \
@@ -91,13 +92,23 @@ class DeeplabV3Plus:
 
         else:
             entry_block_output = self.EntryBlockMobile(self.img_input)
-            encoder_output = self.MobileNet_Backbone_Encoder(entry_block_output)
+            encoder_output = self.MobileNet_Backbone_Encoder(
+                entry_block_output)
             # There is no call to Decoder function for mobilenet backbone as in the implementation the
             # ASPP output is directly upsampled to the input image size
             decoder_output = self.AtrousSpatialPyramidPooling(encoder_output)
             model_name = model_name_prefix
 
-        final_output = self.Final_Class_Prediction(decoder_output, final_upsample)
+        if final_class_prediction:
+            final_output = self.Final_Class_Prediction(decoder_output)
+        else:
+            final_output = decoder_output
+            model_name = model_name_prefix + "-no_class_prediction"
+
+        if final_upsample:
+            # Bilinear upsample to input shape
+            final_output = tf.keras.layers.Resizing(
+                *self.input_shape[0:2], interpolation="bilinear")(final_output)
 
         # Ensure that the model takes into account
         # any potential predecessors of `input_tensor`.
@@ -282,7 +293,7 @@ class DeeplabV3Plus:
 
         return x
 
-    def Final_Class_Prediction(self, inputs, final_upsample):
+    def Final_Class_Prediction(self, inputs):
         # Final Convolution for class prediction
         if self.classes == 21 and self.weights == 'pascal_voc':
             last_layer_name = 'logits_semantic'
@@ -292,17 +303,13 @@ class DeeplabV3Plus:
         x = Conv2D(self.classes, (1, 1), padding='same',
                    name=last_layer_name)(inputs)
 
-
-        if final_upsample:
-            # Bilinear upsample to input shape
-            x = tf.keras.layers.Resizing(
-                *self.input_shape[0:2], interpolation="bilinear")(x)
         return x
 
     def EntryBlockMobile(self, inputs):
         first_block_filters = DeeplabV3Plus._make_divisible(32 * self.alpha, 8)
         pointwise_conv_filters = int(16 * self.alpha)
-        pointwise_filters = DeeplabV3Plus._make_divisible(pointwise_conv_filters, 8)
+        pointwise_filters = DeeplabV3Plus._make_divisible(
+            pointwise_conv_filters, 8)
         prefix = "expanded_conv_"
 
         # First convolution
@@ -325,7 +332,8 @@ class DeeplabV3Plus:
         x = Conv2D(pointwise_filters,
                    kernel_size=1, padding='same', use_bias=False, activation=None,
                    name=prefix + 'project')(x)
-        x = BatchNormalization(epsilon=1e-3, momentum=0.999, name=prefix + 'project_BN')(x)
+        x = BatchNormalization(epsilon=1e-3, momentum=0.999,
+                               name=prefix + 'project_BN')(x)
         return x
 
     def MobileNet_Backbone_Encoder(self, inputs):
@@ -388,7 +396,8 @@ class DeeplabV3Plus:
         for i in range(3):
             residual = DeeplabV3Plus._SepConv_BN(residual,
                                                  filter_list[i],
-                                                 prefix + f'_separable_conv{i + 1}',
+                                                 prefix +
+                                                 f'_separable_conv{i + 1}',
                                                  stride=last_stride if i == 2 else 1,
                                                  rate=rate,
                                                  depth_activation=depth_activation)
@@ -418,7 +427,8 @@ class DeeplabV3Plus:
     def _inverted_res_block(inputs, expansion_factor, stride, alpha, filters, block_id, skip_connection, rate=1):
         in_channels = inputs.shape[-1]
         pointwise_conv_filters = int(filters * alpha)
-        pointwise_filters = DeeplabV3Plus._make_divisible(pointwise_conv_filters, 8)
+        pointwise_filters = DeeplabV3Plus._make_divisible(
+            pointwise_conv_filters, 8)
         prefix = f"expanded_conv_{block_id}_"
 
         # Expand
@@ -468,7 +478,7 @@ class DeeplabV3Plus:
             depth_padding = 'same'
         else:
             kernel_size_effective = kernel_size + \
-                                    (kernel_size - 1) * (rate - 1)
+                (kernel_size - 1) * (rate - 1)
             pad_total = kernel_size_effective - 1
             pad_beg = pad_total // 2
             pad_end = pad_total - pad_beg
@@ -518,7 +528,7 @@ class DeeplabV3Plus:
                           name=prefix)(x)
         else:
             kernel_size_effective = kernel_size + \
-                                    (kernel_size - 1) * (rate - 1)
+                (kernel_size - 1) * (rate - 1)
             pad_total = kernel_size_effective - 1
             pad_beg = pad_total // 2
             pad_end = pad_total - pad_beg

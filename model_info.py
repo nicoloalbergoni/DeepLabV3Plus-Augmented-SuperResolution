@@ -11,9 +11,9 @@ def main(plot_model=False):
         OS=16,
         last_activation=None,
         load_weights=True,
-        backbone="mobilenet",
+        backbone="xception",
         alpha=1.,
-        reshape_outputs=False).build_model(only_DCNN_output=False, only_ASPP_output=False)
+        reshape_outputs=False).build_model(final_upsample=False, final_class_prediction=False)
 
     if plot_model:
 
@@ -24,10 +24,10 @@ def main(plot_model=False):
 
         tf.keras.utils.plot_model(
             model, to_file=f'{MODELS_PLOT_DIR}/{model.name}.png', show_shapes=True, show_dtype=False,
-            show_layer_names=True, rankdir='TB', show_layer_activations=False)
+            show_layer_names=True, rankdir='TB')
 
     print(model.summary())
 
 
 if __name__ == '__main__':
-    main(plot_model=False)
+    main(plot_model=True)
