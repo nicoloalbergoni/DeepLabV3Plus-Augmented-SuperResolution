@@ -25,6 +25,9 @@ parser.add_argument("--angle_max", help="Max angle value (in radians) used for r
 parser.add_argument("--shift_max", help="Max shift value used for traslations", action="store",
                     type=int, default=30)
 
+parser.add_argument("--backbone", help="Either mobilenet or xception, specifies the type of backbone to use", action="store",
+                    type=str, choices=["mobilenet", "xception"], default="xception")
+
 args = parser.parse_args()
 
 
@@ -41,6 +44,7 @@ NUM_SAMPLES = args.num_samples
 ANGLE_MAX = args.angle_max
 SHIFT_MAX = args.shift_max
 MODE_SLICE = args.mode_slice
+MODEL_BACKBONE = args.backbone
 USE_VALIDATION = False
 
 DATA_DIR = os.path.join(os.getcwd(), "data")
@@ -50,9 +54,10 @@ IMGS_PATH = os.path.join(PASCAL_ROOT, "JPEGImages")
 SUPERRES_ROOT = os.path.join(DATA_DIR, "superres_root")
 AUGMENTED_COPIES_ROOT = os.path.join(SUPERRES_ROOT, "augmented_copies")
 AUGMENTED_COPIES_OUTPUT_DIR = os.path.join(AUGMENTED_COPIES_ROOT,
-                                           f"{'slice' if MODE_SLICE else 'argmax'}_{NUM_AUG}{'_validation' if USE_VALIDATION else ''}")
+                                           f"{MODEL_BACKBONE}_{'slice' if MODE_SLICE else 'argmax'}_{NUM_AUG}{'_validation' if USE_VALIDATION else ''}")
+STANDARD_OUTPUT_ROOT = os.path.join(SUPERRES_ROOT, "standard_output")
 STANDARD_OUTPUT_DIR = os.path.join(
-    SUPERRES_ROOT, f"standard_output{'_validation' if USE_VALIDATION else ''}")
+    STANDARD_OUTPUT_ROOT, f"{MODEL_BACKBONE}{'_validation' if USE_VALIDATION else ''}")
 
 
 def compute_standard_output(image_dict, model, dest_folder, filter_class_id=None):
@@ -195,6 +200,7 @@ def compute_augmented_features(image_filenames, model, dest_folder, filter_class
         file.attrs["mode"] = "slice" if mode_slice else "argmax"
         file.attrs["angle_max"] = angle_max
         file.attrs["shift_max"] = shift_max
+        file.attrs["backbone"] = MODEL_BACKBONE
 
         file.close()
 
@@ -219,7 +225,7 @@ def main():
         OS=16,
         last_activation=None,
         load_weights=True,
-        backbone="mobilenet",
+        backbone=MODEL_BACKBONE,
         alpha=1.).build_model(final_upsample=False)
 
     model_standard = DeeplabV3Plus(
@@ -228,7 +234,7 @@ def main():
         OS=16,
         last_activation=None,
         load_weights=True,
-        backbone="mobilenet",
+        backbone=MODEL_BACKBONE,
         alpha=1.).build_model(final_upsample=True)
 
     # Compute standard (classicl upsample) masks

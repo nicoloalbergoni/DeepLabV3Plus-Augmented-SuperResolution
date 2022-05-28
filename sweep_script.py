@@ -3,6 +3,7 @@ import wandb
 import numpy as np
 from tqdm import tqdm
 import tensorflow as tf
+from generate_augmented_copies import MODEL_BACKBONE
 from superresolution_scripts.superresolution import Superresolution
 from superresolution_scripts.optimizer import Optimizer
 from utils import load_image
@@ -23,6 +24,7 @@ NUM_AUG = 100
 CLASS_ID = 8
 NUM_SAMPLES = 500
 MODE_SLICE = False
+MODEL_BACKBONE = "xception"
 USE_VALIDATION = False
 
 DATA_DIR = os.path.join(os.getcwd(), "data")
@@ -33,8 +35,9 @@ SUPERRES_ROOT = os.path.join(DATA_DIR, "superres_root")
 AUGMENTED_COPIES_ROOT = os.path.join(SUPERRES_ROOT, "augmented_copies")
 PRECOMPUTED_OUTPUT_DIR = os.path.join(
     AUGMENTED_COPIES_ROOT, f"{'slice' if MODE_SLICE else 'argmax'}_{NUM_AUG}{'_validation' if USE_VALIDATION else ''}")
+STANDARD_OUTPUT_ROOT = os.path.join(SUPERRES_ROOT, "standard_output")
 STANDARD_OUTPUT_DIR = os.path.join(
-    SUPERRES_ROOT, f"standard_output{'_validation' if USE_VALIDATION else ''}")
+    STANDARD_OUTPUT_ROOT, f"{MODEL_BACKBONE}{'_validation' if USE_VALIDATION else ''}")
 SUPERRES_OUTPUT_DIR = os.path.join(
     SUPERRES_ROOT, f"superres_output{'_validation' if USE_VALIDATION else ''}")
 
