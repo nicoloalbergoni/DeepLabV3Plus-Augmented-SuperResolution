@@ -6,7 +6,7 @@ from superresolution_scripts.optimizer import Optimizer
 
 
 @tf.function
-def bilateral_tv(target_image, alpha=0.4, shift_factor=3):
+def bilateral_tv(target_image, alpha=0.6, shift_factor=2):
     h_shifts = np.arange(-shift_factor, shift_factor + 1, step=1)
     v_shifts = np.arange(0, shift_factor + 1, step=1)
     pairs = [[h, v] for h in h_shifts for v in v_shifts]

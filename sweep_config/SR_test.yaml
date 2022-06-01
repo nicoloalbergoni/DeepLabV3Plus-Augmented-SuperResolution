@@ -1,10 +1,10 @@
 entity: albergoni-nicolo
-project: Testing no normalization (Normal images)
+project: Classic Images
 program: SR_test.py
 method: bayes
 metric:
-  goal: minimize
-  name: Avg_MSE_Aug
+  goal: maximize
+  name: Avg_PSNR_Aug
 parameters:
   lambda_df:
     value: 1.0
@@ -21,28 +21,28 @@ parameters:
     min: 0.0
     distribution: uniform
   num_iter:
-    values:
-      - 100
-      - 200
-      - 300
-      - 400
+    value: 200
   optimizer:
     value: adam
-  # lr_scheduler:
-  #   value: True
+  lr_scheduler:
+    value: True
   decay_rate:
-    max: 0.9
+    max: 1.0
     min: 0.0
     distribution: q_uniform
     q: 0.05
-  # decay_steps:
-  #   value: 50
+  decay_steps:
+    max: 80
+    min: 10
+    distribution: q_uniform
+    q: 10
   learning_rate:
     values:
       - 1e-2
-      - 1e-3  
+      - 1e-3 
+      - 1e-1
   copy_dropout:
-    max: 0.9
+    max: 0.4
     min: 0.0
     distribution: q_uniform
     q: 0.1

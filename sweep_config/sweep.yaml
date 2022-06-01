@@ -1,10 +1,10 @@
 entity: albergoni-nicolo
-project: Argmax 500 samples 
+project: Argmax 0.2 angle 5 shift
 program: sweep_script.py
 method: bayes
 metric:
   goal: maximize
-  name: mean_superres_iou
+  name: avg_aug_SR_iou
 parameters:
   lambda_df:
     value: 1.0
@@ -21,7 +21,7 @@ parameters:
     min: 0.0
     distribution: uniform
   num_iter:
-    value: 400
+    value: 300
   optimizer:
     value: adam
   lr_scheduler:

@@ -3,7 +3,6 @@ import wandb
 import numpy as np
 from tqdm import tqdm
 import tensorflow as tf
-from generate_augmented_copies import MODEL_BACKBONE
 from superresolution_scripts.superresolution import Superresolution
 from superresolution_scripts.optimizer import Optimizer
 from utils import load_image
@@ -20,9 +19,10 @@ tf.random.set_seed(SEED)
 # tf.config.run_functions_eagerly(True)
 
 IMG_SIZE = (512, 512)
+FEATURE_SIZE = (128, 128)
 NUM_AUG = 100
 CLASS_ID = 8
-NUM_SAMPLES = 500
+NUM_SAMPLES = 300
 MODE_SLICE = False
 MODEL_BACKBONE = "xception"
 USE_VALIDATION = False
@@ -34,7 +34,7 @@ IMGS_PATH = os.path.join(PASCAL_ROOT, "JPEGImages")
 SUPERRES_ROOT = os.path.join(DATA_DIR, "superres_root")
 AUGMENTED_COPIES_ROOT = os.path.join(SUPERRES_ROOT, "augmented_copies")
 PRECOMPUTED_OUTPUT_DIR = os.path.join(
-    AUGMENTED_COPIES_ROOT, f"{'slice' if MODE_SLICE else 'argmax'}_{NUM_AUG}{'_validation' if USE_VALIDATION else ''}")
+    AUGMENTED_COPIES_ROOT, f"{MODEL_BACKBONE}_{'slice' if MODE_SLICE else 'argmax'}_{NUM_AUG}{'_validation' if USE_VALIDATION else ''}")
 STANDARD_OUTPUT_ROOT = os.path.join(SUPERRES_ROOT, "standard_output")
 STANDARD_OUTPUT_DIR = os.path.join(
     STANDARD_OUTPUT_ROOT, f"{MODEL_BACKBONE}{'_validation' if USE_VALIDATION else ''}")
@@ -67,11 +67,7 @@ def main():
         "decay_rate": 0.4,
     }
 
-    wandb_dir = os.path.join(DATA_DIR, "wandb_logs")
-    if not os.path.exists(wandb_dir):
-        os.makedirs(wandb_dir)
-
-    wandb.init(config=hyperparamters_default, dir=wandb_dir)
+    wandb.init(config=hyperparamters_default)
 
     config = wandb.config
 
@@ -88,7 +84,7 @@ def main():
                               lr_scheduler=config.lr_scheduler, decay_steps=config.decay_steps, decay_rate=config.decay_rate)
 
     superresolution_obj = Superresolution(lambda_df=config.lambda_df, **coeff_dict, num_iter=config.num_iter,
-                                          num_aug=config.num_aug, optimizer=optimizer_obj, use_BTV=config.use_BTV, copy_dropout=config.copy_dropout)
+                                          num_aug=config.num_aug, optimizer=optimizer_obj, use_BTV=config.use_BTV, copy_dropout=config.copy_dropout, feature_size=FEATURE_SIZE)
 
     path_list = list_precomputed_data_paths(PRECOMPUTED_OUTPUT_DIR, sort=True)
     precomputed_data_paths = path_list if config.num_samples is None else path_list[

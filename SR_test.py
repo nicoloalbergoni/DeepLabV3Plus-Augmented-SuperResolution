@@ -21,8 +21,8 @@ tf.random.set_seed(SEED)
 IMG_SIZE = (512, 512)
 COPIES_SIZE = (64, 64)
 NUM_AUG = 100
-ANGLE_MAX = 0.3
-SHIFT_MAX = 20
+ANGLE_MAX = 1
+SHIFT_MAX = 15
 
 DATA_DIR = os.path.join(os.getcwd(), "data")
 TEST_ROOT = os.path.join(DATA_DIR, "test_root")
@@ -134,8 +134,20 @@ def compute_SR(original_image, superres_obj: Superresolution, dest_folder, angle
     target_augmented_SR, _ = superres_obj.augmented_superresolution(
         augmented_copies, angles, shifts)
 
+    target_max_SR, _ = superres_obj.max_superresolution(
+        augmented_copies, angles, shifts)
+
+    target_mean_SR, _ = superres_obj.mean_superresolution(
+        augmented_copies, angles, shifts)
+
     target_augmented_SR = tf.clip_by_value(
         target_augmented_SR, 0.0, 255.0).numpy()
+
+    target_max_SR = tf.clip_by_value(
+        target_max_SR, 0.0, 255.0).numpy()
+
+    target_mean_SR = tf.clip_by_value(
+        target_mean_SR, 0.0, 255.0).numpy()
 
     if save_copies:
         augmented_copies = augmented_copies.numpy()
@@ -146,12 +158,33 @@ def compute_SR(original_image, superres_obj: Superresolution, dest_folder, angle
             tf.keras.utils.save_img(
                 f"{copies_folder}/{i}.png", copy, scale=True)
 
-    mse_augmented_SR = mean_squared_error(
-        original_image, target_augmented_SR)
     psnr_augmented_SR = peak_signal_noise_ratio(
-        original_image, target_augmented_SR, data_range=255)
+        original_image, target_augmented_SR, data_range=1)
+    psnr_max_SR = peak_signal_noise_ratio(
+        original_image, target_max_SR, data_range=1)
+    psnr_mean_SR = peak_signal_noise_ratio(
+        original_image, target_mean_SR, data_range=1)
 
-    return target_augmented_SR, psnr_augmented_SR, mse_augmented_SR
+    # mse_augmented_SR = mean_squared_error(
+    #     original_image, target_augmented_SR)
+    # mse_max_SR = mean_squared_error(
+    #     original_image, target_max_SR)
+    # mse_mean_SR = mean_squared_error(
+    #     original_image, target_mean_SR)
+
+    metrics = {
+        "aug_PSNR": psnr_augmented_SR,
+        "max_PSNR": psnr_max_SR,
+        "mean_PSNR": psnr_mean_SR,
+    }
+
+    target_images = {
+        "aug": target_augmented_SR,
+        "max": target_max_SR,
+        "mean": target_mean_SR,
+    }
+
+    return target_images, metrics
 
 
 def main():
@@ -159,19 +192,19 @@ def main():
     hyperparameters_default = {
         "lambda_df": 1.0,
         "lambda_tv": 0.9,
-        "lambda_L2": 0.05,
-        "lambda_L1": 0.03,
+        "lambda_L2": 0.12,
+        "lambda_L1": 0.05,
         "num_iter": 300,
         "num_aug": NUM_AUG,
         "use_BTV": True,
-        "copy_dropout": 0.0,
+        "copy_dropout": 0.3,
         "optimizer": "adam",
         "learning_rate": 1e-3,
         "lr_scheduler": True,
         "decay_rate": 0.5,
-        "decay_steps": 50,
-        "angle_max": 0.4,
-        "shift_max": 0
+        "decay_steps": 10,
+        "angle_max": 1,
+        "shift_max": 15
     }
 
     wandb_dir = os.path.join(DATA_DIR, "wandb_logs")
@@ -198,32 +231,44 @@ def main():
 
     images_paths = get_images_paths(IMAGE_DIR, is_png=True)
     psnr_aug_list = []
-    mse_aug_list = []
+    psnr_max_list = []
+    psnr_mean_list = []
+    # mse_aug_list = []
 
     for image_path in tqdm(images_paths):
-        original_image = load_image(image_path, normalize=False, is_png=True)
+        original_image = load_image(image_path, normalize=True, is_png=True)
         original_image = original_image.numpy()
 
         # df = test_aug_params(original_image, superresolution_obj, SR_OUTPUT_FOLDER)
         # print(df)
         # print(df.loc[df[['PSNR Aug', "PSNR Max", "PSNR Mean"]].idxmax()])
 
-        target_augmented_SR, psnr_augmented_SR, mse_augmented_SR = compute_SR(
+        target_images, metrics = compute_SR(
             original_image, superresolution_obj, SR_OUTPUT_FOLDER, angle_max=config.angle_max, shift_max=config.shift_max, save_copies=False)
 
         image_name = os.path.splitext(os.path.basename(image_path))[0]
         tf.keras.utils.save_img(
-            f"{SR_OUTPUT_FOLDER}/{image_name}_SR.png", target_augmented_SR, scale=False)
+            f"{SR_OUTPUT_FOLDER}/{image_name}_aug_SR.png", target_images["aug"], scale=True)
+        tf.keras.utils.save_img(
+            f"{SR_OUTPUT_FOLDER}/{image_name}_max_SR.png", target_images["max"], scale=True)
+        tf.keras.utils.save_img(
+            f"{SR_OUTPUT_FOLDER}/{image_name}_mean_SR.png", target_images["mean"], scale=True)
 
-        psnr_aug_list.append(psnr_augmented_SR)
-        mse_aug_list.append(mse_augmented_SR)
+        psnr_aug_list.append(metrics["aug_PSNR"])
+        psnr_max_list.append(metrics["max_PSNR"])
+        psnr_mean_list.append(metrics["mean_PSNR"])
+        # mse_aug_list.append(mse_augmented_SR)
 
     avg_psnr_aug = np.mean(psnr_aug_list)
-    avg_mse_aug = np.mean(mse_aug_list)
+    avg_psnr_max = np.mean(psnr_max_list)
+    avg_psnr_mean = np.mean(psnr_mean_list)
+    # avg_mse_aug = np.mean(mse_aug_list)
 
-    wandb.log({"Avg_PSNR_Aug": avg_psnr_aug, "Avg_MSE_Aug": avg_mse_aug})
+    wandb.log({"Avg_PSNR_Aug": avg_psnr_aug,
+              "Avg_PSNR_Max": avg_psnr_max, "Avg_PSNR_Mean": avg_psnr_mean})
 
-    print(f"Avg. PSNR Aug: {avg_psnr_aug}, Avg. MSE Aug: {avg_mse_aug}")
+    print(
+        f"Avg. PSNR Aug: {avg_psnr_aug}, Avg. PSNR Max: {avg_psnr_max}, Avg. PSNR Mean: {avg_psnr_mean}")
 
 
 if __name__ == '__main__':
