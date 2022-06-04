@@ -32,41 +32,28 @@ def get_img_paths(image_list_path, image_folder, is_png=False, sort=True):
     return paths
 
 
-def filter_image(image_path, class_id, image_size=(512, 512)):
-
+def class_in_image(image_path, class_id, image_size=(512, 512)):
     mask_path = image_path.replace(
         "JPEGImages", "SegmentationClassAug").replace("jpg", "png")
     mask = load_image(mask_path, image_size=image_size,
                       normalize=False, is_png=True, resize_method="nearest")
-    if np.any(mask == class_id):
-        image = load_image(image_path, image_size=image_size, normalize=True)
-        return image
-    else:
-        return None
+
+    return np.any(mask == class_id)
 
 
-def load_images(path_list, num_images=None, filter_class_id=None, image_size=(512, 512)):
-
-    image_dict = {}
+def filter_images_by_class(path_list, filter_class_id, num_images=None, image_size=(512, 512)):
 
     max_images = num_images if num_images is not None else len(path_list)
+    image_paths = []
 
     for path in path_list:
-        if len(image_dict) == max_images:
+        if len(image_paths) == max_images:
             break
 
-        image_name = os.path.splitext(os.path.basename(path))[0]
+        if class_in_image(path, class_id=filter_class_id, image_size=image_size):
+            image_paths.append(path)
 
-        if filter_class_id is not None:
-            image = filter_image(
-                path, class_id=filter_class_id, image_size=image_size)
-            if image is not None:
-                image_dict[image_name] = image
-        else:
-            image_dict[image_name] = load_image(
-                path, image_size=image_size, normalize=True)
-
-    return image_dict
+    return image_paths
 
 
 def min_max_normalization(image, new_min=0.0, new_max=255.0, global_min=None, global_max=None):

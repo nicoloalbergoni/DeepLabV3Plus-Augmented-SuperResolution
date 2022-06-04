@@ -1,14 +1,16 @@
 import os
 import h5py
 import argparse
+import gc
 import numpy as np
 from tqdm import tqdm
 import tensorflow as tf
 from model import DeeplabV3Plus
 import tensorflow_addons as tfa
 from utils import load_image, get_prediction, create_mask
-from superresolution_scripts.superres_utils import get_img_paths, load_images
+from superresolution_scripts.superres_utils import get_img_paths, filter_images_by_class
 
+# os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--num_aug", help="Number of augmented copies created for each image",
@@ -37,7 +39,7 @@ np.random.seed(SEED)
 tf.random.set_seed(SEED)
 
 IMG_SIZE = (512, 512)
-BATCH_SIZE = 8
+BATCH_SIZE = 16
 NUM_AUG = args.num_aug
 CLASS_ID = 8
 NUM_SAMPLES = args.num_samples
@@ -60,21 +62,23 @@ STANDARD_OUTPUT_DIR = os.path.join(
     STANDARD_OUTPUT_ROOT, f"{MODEL_BACKBONE}{'_validation' if USE_VALIDATION else ''}")
 
 
-def compute_standard_output(image_dict, model, dest_folder, filter_class_id=None):
-    standard_masks = {}
+def compute_standard_output(images_paths, model, dest_folder, filter_class_id=None, image_size=(512, 512), overwrite=False):
     if not os.path.exists(dest_folder):
         os.makedirs(dest_folder)
 
-    for key in tqdm(image_dict):
-        standard_mask = get_prediction(model, image_dict[key])
+    for image_path in tqdm(images_paths):
+        image_name = os.path.splitext(os.path.basename(image_path))[0]
+        save_path = os.path.join(dest_folder, f"{image_name}.png")
+
+        if not overwrite and os.path.exists(save_path):
+            continue
+
+        image = load_image(image_path, image_size=image_size, normalize=True)
+        standard_mask = get_prediction(model, image)
         if filter_class_id is not None:
             standard_mask = tf.where(standard_mask == filter_class_id, standard_mask,
                                      0)  # Set to 0 all predictions different from the given class
-        tf.keras.utils.save_img(
-            f"{dest_folder}/{key}.png", standard_mask, scale=False)
-        standard_masks[key] = standard_mask
-
-    return standard_masks
+        tf.keras.utils.save_img(save_path, standard_mask, scale=False)
 
 
 def create_augmented_copies(image, num_aug, angle_max, shift_max):
@@ -128,22 +132,20 @@ def create_augmented_copies_chunked(image, num_aug, angle_max, shift_max, chunk_
     return augmented_copies, angles, shifts
 
 
-def compute_augmented_features(image_filenames, model, dest_folder, filter_class_id, mode_slice=True, num_aug=100,
-                               angle_max=0.5, shift_max=30, save_output=False, relu_output=False):
-    augmented_features = {}
+def compute_augmented_features(images_paths, model, dest_folder, filter_class_id, mode_slice=True, num_aug=100,
+                               angle_max=0.5, shift_max=30, save_output=False, relu_output=False, image_size=(512, 512)):
 
-    for filename in tqdm(image_filenames):
+    for image_path in tqdm(images_paths):
+        image_name = os.path.splitext(os.path.basename(image_path))[0]
 
         # Load image
-        image_path = os.path.join(IMGS_PATH, f"{filename}.jpg")
-        image = load_image(image_path, image_size=IMG_SIZE, normalize=True)
-
+        image = load_image(image_path, image_size=image_size, normalize=True)
         # Create augmented copies
         augmented_copies, angles, shifts = create_augmented_copies(image, num_aug=num_aug, angle_max=angle_max,
                                                                    shift_max=shift_max)
 
         # Create destination folder
-        output_folder = os.path.join(dest_folder, filename)
+        output_folder = os.path.join(dest_folder, image_name)
         if not os.path.exists(output_folder):
             os.makedirs(output_folder)
 
@@ -152,16 +154,21 @@ def compute_augmented_features(image_filenames, model, dest_folder, filter_class
 
         predictions = model.predict(augmented_copies, batch_size=BATCH_SIZE)
 
+        # Used to clear memory as it appears that there is a memory leak with something related to model.predict
+        _ = gc.collect()
+
         for i, prediction in enumerate(predictions):
 
             if mode_slice:
-                class_slice = prediction[:, :, filter_class_id]
-                class_mask = class_slice[..., np.newaxis]
+                # Get the slice corresponding to the class id
+                class_mask = tf.gather(
+                    prediction, filter_class_id, axis=-1)[..., tf.newaxis]
 
-                no_class_prediction = np.delete(
-                    prediction, filter_class_id, axis=-1)
-                max_mask = no_class_prediction.max(axis=-1)
-                max_mask = max_mask[..., np.newaxis]
+                # Get all the other slices and compute the max pixel-wise
+                gather_indexes = np.delete(
+                    np.arange(0, tf.shape(prediction)[-1], step=1), filter_class_id)
+                max_mask = tf.reduce_max(
+                    tf.gather(prediction, gather_indexes, axis=-1), axis=-1)[..., tf.newaxis]
 
                 # ReLU is only needed when working with slices
                 if relu_output:
@@ -188,7 +195,7 @@ def compute_augmented_features(image_filenames, model, dest_folder, filter_class
                     tf.keras.utils.save_img(
                         f"{output_folder}/{i}_max.png", max_mask, scale=True)
 
-        file = h5py.File(f"{output_folder}/{filename}.hdf5", "w")
+        file = h5py.File(f"{output_folder}/{image_name}.hdf5", "w")
         file.create_dataset("class_masks", data=class_masks)
 
         if mode_slice:
@@ -196,7 +203,7 @@ def compute_augmented_features(image_filenames, model, dest_folder, filter_class
 
         file.create_dataset("angles", data=angles)
         file.create_dataset("shifts", data=shifts)
-        file.attrs["filename"] = filename
+        file.attrs["filename"] = image_name
         file.attrs["mode"] = "slice" if mode_slice else "argmax"
         file.attrs["angle_max"] = angle_max
         file.attrs["shift_max"] = shift_max
@@ -204,31 +211,19 @@ def compute_augmented_features(image_filenames, model, dest_folder, filter_class
 
         file.close()
 
-        augmented_features[filename] = {"class": class_masks, "max": max_masks}
-
-    return augmented_features
-
 
 def main():
     image_list_path = os.path.join(DATA_DIR, "augmented_file_lists",
                                    f"{'valaug' if USE_VALIDATION else 'trainaug'}.txt")
     image_paths = get_img_paths(
         image_list_path, IMGS_PATH, is_png=False, sort=True)
-    images_dict = load_images(
-        image_paths, num_images=NUM_SAMPLES, filter_class_id=CLASS_ID, image_size=IMG_SIZE)
+    images_paths_filtered = filter_images_by_class(
+        image_paths, filter_class_id=CLASS_ID, num_images=NUM_SAMPLES, image_size=IMG_SIZE)
 
-    print(f"Valid images: {len(images_dict)} (Initial:  {len(image_paths)})")
+    print(
+        f"Valid images: {len(images_paths_filtered)} (Initial: {len(image_paths)})")
 
-    model_no_upsample = DeeplabV3Plus(
-        input_shape=(512, 512, 3),
-        classes=21,
-        OS=16,
-        last_activation=None,
-        load_weights=True,
-        backbone=MODEL_BACKBONE,
-        alpha=1.).build_model(final_upsample=False)
-
-    model_standard = DeeplabV3Plus(
+    model = DeeplabV3Plus(
         input_shape=(512, 512, 3),
         classes=21,
         OS=16,
@@ -239,14 +234,23 @@ def main():
 
     # Compute standard (classicl upsample) masks
     print("Computing standard output images...")
-    compute_standard_output(images_dict, model_standard, dest_folder=STANDARD_OUTPUT_DIR,
-                            filter_class_id=CLASS_ID)
+    compute_standard_output(images_paths_filtered, model, dest_folder=STANDARD_OUTPUT_DIR,
+                            filter_class_id=CLASS_ID, overwrite=False)
+
+    model = DeeplabV3Plus(
+        input_shape=(512, 512, 3),
+        classes=21,
+        OS=16,
+        last_activation=None,
+        load_weights=True,
+        backbone=MODEL_BACKBONE,
+        alpha=1.).build_model(final_upsample=False)
 
     print("Generating augmented copies...")
-    compute_augmented_features(images_dict, model_no_upsample, mode_slice=MODE_SLICE,
+    compute_augmented_features(images_paths_filtered, model, mode_slice=MODE_SLICE,
                                dest_folder=AUGMENTED_COPIES_OUTPUT_DIR, filter_class_id=CLASS_ID,
                                num_aug=NUM_AUG, angle_max=ANGLE_MAX, shift_max=SHIFT_MAX,
-                               save_output=False, relu_output=False)
+                               save_output=True, relu_output=False, image_size=IMG_SIZE)
 
 
 if __name__ == '__main__':
