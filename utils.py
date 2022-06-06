@@ -1,4 +1,3 @@
-import os
 import numpy as np
 from matplotlib import pyplot as plt
 import tensorflow as tf
@@ -87,6 +86,29 @@ def sparse_Mean_IOU(y_true, y_pred):
     return tf.reduce_mean(iou)
 
 
+def single_class_IOU(y_true, y_pred, class_id):
+    y_true_squeeze = tf.squeeze(y_true)
+    y_pred_squeeze = tf.squeeze(y_pred)
+    classes = [0, class_id]  # Only check in background and given class
+
+    y_true_squeeze = tf.where(y_true_squeeze != class_id, 0, y_true_squeeze)
+
+    ious = []
+    for i in classes:
+        true_labels = tf.equal(y_true_squeeze, i)
+        pred_labels = tf.equal(y_pred_squeeze, i)
+        inter = tf.cast(true_labels & pred_labels, tf.int32)
+        union = tf.cast(true_labels | pred_labels, tf.int32)
+
+        iou = tf.reduce_sum(inter) / tf.reduce_sum(union)
+        ious.append(iou)
+
+    ious = tf.stack(ious)
+    legal_labels = ~tf.math.is_nan(ious)
+    ious = tf.gather(ious, indices=tf.where(legal_labels))
+    return tf.reduce_mean(ious)
+
+
 def load_image(img_path, image_size=None, normalize=True, is_png=False, resize_method="bilinear"):
     raw_img = tf.io.read_file(img_path)
 
@@ -142,3 +164,27 @@ def print_labels(masks):
     for i in range(2):
         values, count = np.unique(masks[i], return_counts=True)
         print(title[i] + str(dict(zip(values, count))))
+
+
+def compute_IoU(true_image, image, img_size=(512, 512), class_id=None):
+    """
+    Compute the IoU between the true image and the given imge.
+
+    Args:
+        true_image (Tensor): Ground Truth image HR
+        image (Tensor): Given image
+        img_size (tuple, optional): HR image size. Defaults to (512, 512).
+        class_id (int, optional): id of the choosen class. Defaults to 8.
+
+    Returns:
+        float, float: The IoUs of the standard and superresolution images
+    """
+    true_image = tf.reshape(true_image, (img_size[0] * img_size[1], 1))
+    image = tf.reshape(image, (img_size[0] * img_size[1], 1))
+
+    if class_id is not None:
+        iou = single_class_IOU(true_image, image, class_id=class_id)
+    else:
+        iou = sparse_Mean_IOU(true_image, image)
+
+    return iou.numpy()

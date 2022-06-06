@@ -1,10 +1,7 @@
 import os
 import h5py
 import numpy as np
-from scipy.fftpack import shift
 import tensorflow as tf
-from matplotlib import pyplot as plt
-from superresolution_scripts.optimizer import Optimizer
 from superresolution_scripts.superresolution import Superresolution
 from utils import load_image
 
@@ -142,29 +139,6 @@ def threshold_image(image, th_value, th_factor=.15, th_mask=None):
     return th_image.numpy()
 
 
-def single_class_IOU(y_true, y_pred, class_id):
-    y_true_squeeze = tf.squeeze(y_true)
-    y_pred_squeeze = tf.squeeze(y_pred)
-    classes = [0, class_id]  # Only check in background and given class
-
-    y_true_squeeze = tf.where(y_true_squeeze != class_id, 0, y_true_squeeze)
-
-    ious = []
-    for i in classes:
-        true_labels = tf.equal(y_true_squeeze, i)
-        pred_labels = tf.equal(y_pred_squeeze, i)
-        inter = tf.cast(true_labels & pred_labels, tf.int32)
-        union = tf.cast(true_labels | pred_labels, tf.int32)
-
-        iou = tf.reduce_sum(inter) / tf.reduce_sum(union)
-        ious.append(iou)
-
-    ious = tf.stack(ious)
-    legal_labels = ~tf.math.is_nan(ious)
-    ious = tf.gather(ious, indices=tf.where(legal_labels))
-    return tf.reduce_mean(ious)
-
-
 def normalize_coefficients(coeff_dict):
     """
     Given a dictionary of coefficients returns a new dictionary 
@@ -289,24 +263,3 @@ def compute_SR(superresolution_obj: Superresolution, class_masks, angles, shifts
         f"{out_folder}/{filename}_{SR_type}_SR.png", th_mask, scale=True)
 
     return th_mask
-
-
-def compute_IoU(true_image, image, img_size=(512, 512), class_id=8):
-    """
-    Compute the IoU between the true image and the given imge.
-
-    Args:
-        true_image (Tensor): Ground Truth image HR
-        image (Tensor): Given image
-        img_size (tuple, optional): HR image size. Defaults to (512, 512).
-        class_id (int, optional): id of the choosen class. Defaults to 8.
-
-    Returns:
-        float, float: The IoUs of the standard and superresolution images
-    """
-    true_image = tf.reshape(true_image, (img_size[0] * img_size[1], 1))
-    image = tf.reshape(image, (img_size[0] * img_size[1], 1))
-
-    iou = single_class_IOU(true_image, image, class_id=class_id)
-
-    return iou.numpy()

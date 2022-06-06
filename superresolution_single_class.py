@@ -5,9 +5,8 @@ from tqdm import tqdm
 import tensorflow as tf
 from superresolution_scripts.superresolution import Superresolution
 from superresolution_scripts.optimizer import Optimizer
-from utils import load_image
-from superresolution_scripts.superres_utils import compute_IoU, \
-    list_precomputed_data_paths, load_SR_data, compute_SR, normalize_coefficients
+from utils import load_image, compute_IoU
+from superresolution_scripts.superres_utils import list_precomputed_data_paths, load_SR_data, compute_SR, normalize_coefficients
 
 SEED = 1234
 
