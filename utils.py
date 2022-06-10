@@ -59,14 +59,48 @@ def sparse_accuracy_ignoring_last_label(y_true, y_pred):
     return right_labels / total_labels
 
 
+def Mean_IOU(y_true, y_pred):
+    """
+    Compute the Mean Intersection over Union between the predited mask and the ground truth
+
+    Args:
+        y_true (Tensor): Ground truth image flattened (H * W, 1)
+        y_pred (Tensor): Predicted tensor flattened (H * W, NUM_CLASSES)
+
+    Returns:
+        Tensor: Float, mean IoU 
+    """
+    y_true_squeeze = tf.cast(tf.squeeze(y_true), tf.int32)
+    y_pred_squeeze = tf.squeeze(y_pred)
+    pred_pixels = tf.cast(tf.argmax(y_pred_squeeze, axis=-1), tf.int32)
+
+    # Get all the classes contained in the ground truth and remove the void class (id: 255)
+    labels, _ = tf.unique(y_true_squeeze)
+    labels = tf.gather(labels, tf.where(labels != 255))
+    ious = []
+    for i in labels:
+        true_labels = tf.equal(y_true_squeeze, i)
+        pred_labels = tf.equal(pred_pixels, i)
+        inter = tf.cast(true_labels & pred_labels, tf.int32)
+        union = tf.cast(true_labels | pred_labels, tf.int32)
+        iou = tf.reduce_sum(inter) / tf.reduce_sum(union)
+        ious.append(iou)
+    return tf.reduce_mean(ious)
+
+
 def sparse_Mean_IOU(y_true, y_pred):
+    # Mean IoU computed between the ground truth and the predicted tensor each flattened and batched
+
     # tf.print(K.shape(y_true))
     # tf.print(K.shape(y_pred))
     nb_classes = (y_pred.shape.as_list())[-1]
+    # nb_classes = tf.shape(y_pred)[-1]
+
     iou = []
     pred_pixels = tf.argmax(y_pred, axis=-1)
     for i in range(0, nb_classes):  # exclude last label (void)
         y_true_squeeze = y_true[:, :, 0]
+        # y_true_squeeze = tf.squeeze(y_true)
         true_labels = tf.equal(y_true_squeeze, i)
         pred_labels = tf.equal(pred_pixels, i)
         inter = tf.cast(true_labels & pred_labels, tf.int32)
@@ -166,25 +200,29 @@ def print_labels(masks):
         print(title[i] + str(dict(zip(values, count))))
 
 
-def compute_IoU(true_image, image, img_size=(512, 512), class_id=None):
+def compute_IoU(true_image, image, img_size=(512, 512), class_id=None, num_classes=21):
     """
     Compute the IoU between the true image and the given imge.
+    Can be used in single class mode by passing the class_id paramenter or in multiclass mode
+    (Mean IoU) by setting the num_classes parameter
 
     Args:
         true_image (Tensor): Ground Truth image HR
         image (Tensor): Given image
         img_size (tuple, optional): HR image size. Defaults to (512, 512).
-        class_id (int, optional): id of the choosen class. Defaults to 8.
+        class_id (int, optional): id of the choosen class for single-class IoU. Defaults to None.
+        num_classes (int, optional): total number of classes. Default to 21 (PASCAL VOC total classses)
 
     Returns:
         float, float: The IoUs of the standard and superresolution images
     """
     true_image = tf.reshape(true_image, (img_size[0] * img_size[1], 1))
-    image = tf.reshape(image, (img_size[0] * img_size[1], 1))
+    image = tf.reshape(
+        image, (img_size[0] * img_size[1], (1 if class_id is not None else num_classes)))
 
     if class_id is not None:
         iou = single_class_IOU(true_image, image, class_id=class_id)
     else:
-        iou = sparse_Mean_IOU(true_image, image)
+        iou = Mean_IOU(true_image, image)
 
     return iou.numpy()

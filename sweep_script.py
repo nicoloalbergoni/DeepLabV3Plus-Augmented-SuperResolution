@@ -21,7 +21,7 @@ IMG_SIZE = (512, 512)
 FEATURE_SIZE = (128, 128)
 NUM_AUG = 100
 CLASS_ID = 8
-NUM_SAMPLES = 300
+NUM_SAMPLES = 500
 MODE_SLICE = False
 MODEL_BACKBONE = "xception"
 USE_VALIDATION = False
@@ -47,7 +47,7 @@ def main():
         "lambda_tv": 4.75,
         "lambda_L2": 0.11,
         "lambda_L1": 0.0,
-        "num_iter": 450,
+        "num_iter": 300,
         "num_aug": NUM_AUG,
         "num_samples": NUM_SAMPLES,
         "use_BTV": True,
@@ -61,9 +61,9 @@ def main():
         "initial_accumulator_value": 0.1,
         "momentum": 0.6,
         "nesterov": False,
-        "lr_scheduler": False,
+        "lr_scheduler": True,
         "decay_steps": 50,
-        "decay_rate": 0.4,
+        "decay_rate": 0.5,
     }
 
     wandb.init(config=hyperparamters_default)

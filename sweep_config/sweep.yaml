@@ -1,5 +1,5 @@
 entity: albergoni-nicolo
-project: Argmax 0.2 angle 5 shift
+project: Argmax 0.2 angle 5 shift (500 samples)
 program: sweep_script.py
 method: bayes
 metric:
@@ -27,18 +27,22 @@ parameters:
   lr_scheduler:
     value: True
   decay_rate:
-    value: 0.05
+    value: 0.5
   decay_steps:
-    value: 20
+    value: 50
   learning_rate:
     value: 1e-3     
   copy_dropout:
-    max: 0.9
+    max: 0.4
     min: 0.0
     distribution: q_uniform
     q: 0.1
   use_BTV:
-    value: False   
+    value: False
+  amsgrad:
+    values:
+      - True
+      - False   
 #command:
 #- ${env}
 #- C:\Users\alber\Desktop\DeepLabV3Plus-Augmented-SuperResolution\venv\Scripts\python.exe

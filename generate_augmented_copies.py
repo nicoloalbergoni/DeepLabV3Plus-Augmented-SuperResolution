@@ -153,7 +153,6 @@ def compute_augmented_features(images_paths, model, dest_folder, filter_class_id
         max_masks = []
 
         predictions = model.predict(augmented_copies, batch_size=BATCH_SIZE)
-
         # Used to clear memory as it appears that there is a memory leak with something related to model.predict
         _ = gc.collect()
 
