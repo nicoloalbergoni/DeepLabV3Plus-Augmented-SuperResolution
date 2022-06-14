@@ -17,13 +17,15 @@ tf.config.run_functions_eagerly(True)
 # os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 IMG_SIZE = (512, 512)
+FEATURE_SIZE = (128, 128)
 NUM_AUG = 100
 CLASS_ID = 8
-NUM_SAMPLES = 1
+NUM_SAMPLES = 50
 
 MODE_SLICE = False
 MODEL_BACKBONE = "xception"
 USE_VALIDATION = False
+SAVE_SLICE_OUTPUT = False
 
 DATA_DIR = os.path.join(os.getcwd(), "data")
 PASCAL_ROOT = os.path.join(DATA_DIR, "dataset_root", "VOCdevkit", "VOC2012")
@@ -43,16 +45,16 @@ SUPERRES_OUTPUT_DIR = os.path.join(
 def main():
     hyperparamters_default = {
         "lambda_df": 1.0,
-        "lambda_tv": 0.54,
-        "lambda_L2": 1.1,
-        "lambda_L1": 0.04,
-        "num_iter": 150,
+        "lambda_tv": 0.79,
+        "lambda_L2": 0.085,
+        "lambda_L1": 0.0022,
+        "num_iter": 300,
         "num_aug": NUM_AUG,
         "num_samples": NUM_SAMPLES,
-        "copy_dropout": 0.0,
-        "use_BTV": True,
+        "copy_dropout": 0.2,
+        "use_BTV": False,
         "optimizer": "adam",
-        "learning_rate": 1e-2,
+        "learning_rate": 1e-3,
         "beta_1": 0.9,
         "beta_2": 0.999,
         "epsilon": 1e-7,
@@ -62,7 +64,7 @@ def main():
         "momentum": 0.2,
         "lr_scheduler": True,
         "decay_steps": 50,
-        "decay_rate": 0.6,
+        "decay_rate": 0.5,
     }
 
     wandb_dir = os.path.join(DATA_DIR, "wandb_logs")
@@ -89,7 +91,7 @@ def main():
                               lr_scheduler=config.lr_scheduler, decay_steps=config.decay_steps, decay_rate=config.decay_rate)
 
     superresolution_obj = Superresolution(lambda_df=config.lambda_df, **coeff_dict, num_iter=config.num_iter,
-                                          num_aug=config.num_aug, optimizer=optimizer_obj, use_BTV=config.use_BTV, copy_dropout=config.copy_dropout)
+                                          num_aug=config.num_aug, optimizer=optimizer_obj, use_BTV=config.use_BTV, copy_dropout=config.copy_dropout, feature_size=FEATURE_SIZE)
 
     path_list = list_precomputed_data_paths(PRECOMPUTED_OUTPUT_DIR, sort=True)
     precomputed_data_paths = path_list if config.num_samples is None else path_list[
@@ -120,13 +122,13 @@ def main():
                                    resize_method="nearest")
 
         target_augmented_SR = compute_SR(superresolution_obj, class_masks, angles, shifts, filename, max_masks=max_masks, SR_type="aug",
-                                         save_output=False, class_id=CLASS_ID, dest_folder=SUPERRES_OUTPUT_DIR)
+                                         save_output=SAVE_SLICE_OUTPUT, class_id=CLASS_ID, dest_folder=SUPERRES_OUTPUT_DIR)
 
         target_max_SR = compute_SR(superresolution_obj, class_masks, angles, shifts, filename, max_masks=max_masks, SR_type="max",
-                                   save_output=False, class_id=CLASS_ID, dest_folder=SUPERRES_OUTPUT_DIR)
+                                   save_output=SAVE_SLICE_OUTPUT, class_id=CLASS_ID, dest_folder=SUPERRES_OUTPUT_DIR)
 
         target_mean_SR = compute_SR(superresolution_obj, class_masks, angles, shifts, filename, max_masks=max_masks, SR_type="mean",
-                                    save_output=False, class_id=CLASS_ID, dest_folder=SUPERRES_OUTPUT_DIR)
+                                    save_output=SAVE_SLICE_OUTPUT, class_id=CLASS_ID, dest_folder=SUPERRES_OUTPUT_DIR)
 
         standard_iou = compute_IoU(
             true_mask, standard_mask, img_size=IMG_SIZE, class_id=CLASS_ID)
