@@ -1,7 +1,9 @@
 import os
+from pickletools import int4
 import wandb
 import random
 import gc
+import itertools
 import numpy as np
 from tqdm import tqdm
 import tensorflow as tf
@@ -12,7 +14,7 @@ from model import DeeplabV3Plus
 from superresolution_scripts.superres_utils import get_img_paths
 from utils import load_image, Mean_IOU, compute_IoU, create_mask
 
-# os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 SEED = 1234
 
@@ -23,9 +25,8 @@ tf.random.set_seed(SEED)
 # tf.config.run_functions_eagerly(True)
 
 IMG_SIZE = (512, 512)
-FEATURE_SIZE = (128, 128)
 CLASS_ID = 8
-NUM_SAMPLES = 10
+NUM_SAMPLES = 200
 MODE_SLICE = False
 MODEL_BACKBONE = "xception"
 USE_VALIDATION = False
@@ -38,11 +39,11 @@ IMGS_PATH = os.path.join(PASCAL_ROOT, "JPEGImages")
 DEST_FOLDER = os.path.join(os.getcwd(), "prediction_output")
 
 
-def augment_images(images, angles, shifts, interpolation="bilinear"):
+def augment_images(images, angle, shift_x, shift_y, interpolation="bilinear"):
     rotated_images = tfa.image.rotate(
-        images, angles, interpolation=interpolation, fill_mode="constant")
+        images, angle, interpolation=interpolation, fill_mode="constant")
     translated_images = tfa.image.translate(
-        rotated_images, shifts, interpolation=interpolation, fill_mode="constant")
+        rotated_images, [shift_x, shift_y], interpolation=interpolation, fill_mode="constant")
 
     return translated_images
 
@@ -97,23 +98,28 @@ def main():
         reshape_outputs=False,
         alpha=1.).build_model()
 
-    angle_max_range = np.arange(0.0, 3.2, step=0.1)
-    shift_max_range = np.arange(0, 60, step=10)
-    angle_shift_permutations = [(a, s)
-                                for a in angle_max_range for s in shift_max_range]
+    # angle_values = [round(angle, 2) for angle in np.linspace(0.0, 3.14, num=7)]
+    # shift_x_values = np.linspace(0, 60, num=7, dtype=int)
+    # shift_y_values = np.linspace(0, 60, num=7, dtype=int)
 
-    for i, (angle_max, shift_max) in tqdm(enumerate(angle_shift_permutations)):
+    angle_values = [round(angle, 2)
+                    for angle in np.arange(-0.5, 0.5, step=0.1)]
+    shift_x_values = np.linspace(0, 60, num=7, dtype=int)
+    shift_y_values = np.linspace(0, 60, num=7, dtype=int)
 
-        wandb.init(project="Robustness check", entity="albergoni-nicolo")
+    all_combinations = list(itertools.product(
+        angle_values, shift_x_values, shift_y_values))
 
-        angles = np.random.uniform(-angle_max, angle_max, NUM_SAMPLES)
-        shifts = np.random.uniform(-shift_max, shift_max, (NUM_SAMPLES, 2))
-        angles = angles.astype("float32")
-        shifts = shifts.astype("float32")
+    # wandb.init(project="Robustness check", entity="albergoni-nicolo")
 
-        aug_images = augment_images(images, angles, shifts)
+    for i, (angle, shift_x, shift_y) in tqdm(enumerate(all_combinations)):
+
+        wandb.init(project="Robustness check (Small angles)",
+                   entity="albergoni-nicolo")
+
+        aug_images = augment_images(images, angle, shift_x, shift_y)
         aug_gt = augment_images(
-            gt_images, angles, shifts, interpolation="nearest")
+            gt_images, angle, shift_x, shift_y, interpolation="nearest")
 
         predictions = model.predict(aug_images, batch_size=BATCH_SIZE)
         _ = gc.collect()
@@ -125,7 +131,7 @@ def main():
             save_path = os.path.join(DEST_FOLDER, f"{image_name}.png")
             iou = round(compute_IoU(aug_gt[k], pred), 3)
 
-            plot_title = f"Avg. mIoU: {iou}, Angle: {angle_max}, Shift: {shift_max}"
+            plot_title = f"mIoU: {iou}, Angle: {angle}, Shift X: {shift_x}, Shift Y: {shift_y}"
             save_plot(aug_images[k], create_mask(
                 pred), aug_gt[k], plot_title, save_path)
 
@@ -134,15 +140,16 @@ def main():
         avg_mean_iou = round(np.mean(ious), 3)
 
         print(
-            f"Angle Max: {angle_max}, Shift max: {shift_max}, Mean IoU: {avg_mean_iou}")
+            f"Angle: {angle}, Shift X: {shift_x}, Shift Y: {shift_y}, Mean IoU: {avg_mean_iou}")
 
         wandb.log({
-            "Angle Max": angle_max,
-            "Shift Max": shift_max,
+            "Angle": angle,
+            "Shift X": shift_x,
+            "Shift Y": shift_y,
             "Avg. Mean IoU": avg_mean_iou
         })
 
-        wandb.finish()
+        wandb.finish(quiet=True)
 
     print("Done")
 
