@@ -1,5 +1,4 @@
 import os
-from pickletools import int4
 import wandb
 import random
 import gc
@@ -8,11 +7,10 @@ import numpy as np
 from tqdm import tqdm
 import tensorflow as tf
 from matplotlib import pyplot as plt
-from matplotlib.colors import ListedColormap
 import tensorflow_addons as tfa
 from model import DeeplabV3Plus
 from superresolution_scripts.superres_utils import get_img_paths
-from utils import load_image, Mean_IOU, compute_IoU, create_mask
+from utils import load_image, compute_IoU, create_mask
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
@@ -26,8 +24,7 @@ tf.random.set_seed(SEED)
 
 IMG_SIZE = (512, 512)
 CLASS_ID = 8
-NUM_SAMPLES = 200
-MODE_SLICE = False
+NUM_SAMPLES = 300
 MODEL_BACKBONE = "xception"
 USE_VALIDATION = False
 BATCH_SIZE = 16
@@ -36,7 +33,7 @@ DATA_DIR = os.path.join(os.getcwd(), "data")
 PASCAL_ROOT = os.path.join(DATA_DIR, "dataset_root", "VOCdevkit", "VOC2012")
 IMGS_PATH = os.path.join(PASCAL_ROOT, "JPEGImages")
 
-DEST_FOLDER = os.path.join(os.getcwd(), "prediction_output")
+DEST_FOLDER = os.path.join(DATA_DIR, "robustness_check_output")
 
 
 def augment_images(images, angle, shift_x, shift_y, interpolation="bilinear"):
@@ -103,7 +100,7 @@ def main():
     # shift_y_values = np.linspace(0, 60, num=7, dtype=int)
 
     angle_values = [round(angle, 2)
-                    for angle in np.arange(-0.5, 0.5, step=0.1)]
+                    for angle in np.arange(-0.5, 0.6, step=0.1)]
     shift_x_values = np.linspace(0, 60, num=7, dtype=int)
     shift_y_values = np.linspace(0, 60, num=7, dtype=int)
 
@@ -114,7 +111,7 @@ def main():
 
     for i, (angle, shift_x, shift_y) in tqdm(enumerate(all_combinations)):
 
-        wandb.init(project="Robustness check (Small angles)",
+        wandb.init(project="Robustness check (300 samples, Small angles)",
                    entity="albergoni-nicolo")
 
         aug_images = augment_images(images, angle, shift_x, shift_y)
@@ -144,9 +141,9 @@ def main():
 
         wandb.log({
             "Angle": angle,
-            "Shift X": shift_x,
-            "Shift Y": shift_y,
-            "Avg. Mean IoU": avg_mean_iou
+            "Shift_X": shift_x,
+            "Shift_Y": shift_y,
+            "IoU": avg_mean_iou
         })
 
         wandb.finish(quiet=True)

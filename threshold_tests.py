@@ -21,7 +21,7 @@ IMG_SIZE = (512, 512)
 FEATURE_SIZE = (128, 128)
 NUM_AUG = 100
 CLASS_ID = 8
-NUM_SAMPLES = 10
+NUM_SAMPLES = 50
 
 MODE_SLICE = False
 MODEL_BACKBONE = "xception"
@@ -42,7 +42,7 @@ STANDARD_OUTPUT_DIR = os.path.join(
 SUPERRES_OUTPUT_DIR = os.path.join(
     SUPERRES_ROOT, f"superres_output{'_validation' if USE_VALIDATION else ''}")
 
-TEST_FOLDER = os.path.join(os.getcwd(), "threshold_test")
+OUTPUT_FOLDER = os.path.join(DATA_DIR, "threshold_test")
 
 
 def main():
@@ -74,8 +74,8 @@ def main():
     if not os.path.exists(wandb_dir):
         os.makedirs(wandb_dir)
 
-    if not os.path.exists(TEST_FOLDER):
-        os.makedirs(TEST_FOLDER)
+    if not os.path.exists(OUTPUT_FOLDER):
+        os.makedirs(OUTPUT_FOLDER)
 
     wandb.init(config=hyperparamters_default, dir=wandb_dir)
 
@@ -135,7 +135,7 @@ def main():
         #                            resize_method="nearest")
 
         tf.keras.utils.save_img(
-            f"{TEST_FOLDER}/{filename}.png", image_array.read(i), scale=True)
+            f"{OUTPUT_FOLDER}/{filename}.png", image_array.read(i), scale=True)
 
     th_values = [round(v, 2) for v in np.arange(0.1, 0.95, step=0.05)]
     data_list = []

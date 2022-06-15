@@ -6,27 +6,31 @@ from mpl_toolkits import mplot3d
 from matplotlib import pyplot as plt
 
 ROOT_FOLDER = os.path.join(os.getcwd(), "robustness_check")
-CSV_PATH = os.path.join(ROOT_FOLDER, "robustness_check.csv")
+CSV_PATH = os.path.join(ROOT_FOLDER, "robustness_check_small_angles.csv")
 
 
 def plot3d(x, y, z, save_path):
-    fig = plt.figure(figsize=(8, 8))
+    plt.figure(figsize=(8, 8))
     ax = plt.axes(projection="3d")
-    ax.scatter(x, y, z, cmap="Reds")
+    ax.scatter(x, y, z, c=z, cmap="Reds")
     ax.set_xlabel("Angle")
     ax.set_ylabel("Total shift")
     ax.set_zlabel("Avg. Mean IoU")
-    plt.savefig(os.path.join(save_path, "robustess_3d.png"))
+    plt.savefig(os.path.join(save_path, "robustess_small_3d.png"))
 
 
-def plot2d(x, y, save_path):
-    fig = plt.figure()
-    ax = plt.axes()
-    ax.scatter(x, y)
-    ax.set_xlabel("Angles")
-    ax.set_ylabel("Avg. Mean IoU")
+def plot2d(x, y, save_path, z=None):
+    plt.figure()
+    plt.axes()
+    if z is not None:
+        plt.scatter(x, y, c=z, cmap="Reds")
+        plt.colorbar()
+    else:
+        plt.scatter(x, y, cmap="Reds")
+    plt.xlabel("Angles")
+    plt.ylabel("Avg. Mean IoU")
 
-    plt.savefig(os.path.join(save_path, "robustess_2d.png"))
+    plt.savefig(os.path.join(save_path, "robustess_small_2d.png"))
 
 
 def main():
@@ -41,7 +45,7 @@ def main():
     total_shift = np.add(shift_x, shift_y)
 
     plot3d(angles, total_shift, avg_iou, ROOT_FOLDER)
-    plot2d(angles, avg_iou, ROOT_FOLDER)
+    plot2d(angles, avg_iou, ROOT_FOLDER, z=total_shift)
 
     print(df.to_string())
     print("Done")
