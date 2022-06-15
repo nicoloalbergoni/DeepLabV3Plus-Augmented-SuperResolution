@@ -1,12 +1,13 @@
 import os
 import wandb
 import numpy as np
+import pandas as pd
 from tqdm import tqdm
 import tensorflow as tf
 from superresolution_scripts.superresolution import Superresolution
 from superresolution_scripts.optimizer import Optimizer
 from utils import load_image, compute_IoU
-from superresolution_scripts.superres_utils import list_precomputed_data_paths, load_SR_data, compute_SR, normalize_coefficients
+from superresolution_scripts.superres_utils import list_precomputed_data_paths, load_SR_data, compute_SR, normalize_coefficients, threshold_image
 
 SEED = 1234
 
@@ -20,7 +21,7 @@ IMG_SIZE = (512, 512)
 FEATURE_SIZE = (128, 128)
 NUM_AUG = 100
 CLASS_ID = 8
-NUM_SAMPLES = 50
+NUM_SAMPLES = 10
 
 MODE_SLICE = False
 MODEL_BACKBONE = "xception"
@@ -40,6 +41,8 @@ STANDARD_OUTPUT_DIR = os.path.join(
     STANDARD_OUTPUT_ROOT, f"{MODEL_BACKBONE}{'_validation' if USE_VALIDATION else ''}")
 SUPERRES_OUTPUT_DIR = os.path.join(
     SUPERRES_ROOT, f"superres_output{'_validation' if USE_VALIDATION else ''}")
+
+TEST_FOLDER = os.path.join(os.getcwd(), "threshold_test")
 
 
 def main():
@@ -71,8 +74,8 @@ def main():
     if not os.path.exists(wandb_dir):
         os.makedirs(wandb_dir)
 
-    # wandb.init(project="Single Evaluations", entity="albergoni-nicolo", dir=wandb_dir, name="Sanity Check",
-    #            config=hyperparamters_default)
+    if not os.path.exists(TEST_FOLDER):
+        os.makedirs(TEST_FOLDER)
 
     wandb.init(config=hyperparamters_default, dir=wandb_dir)
 
@@ -97,71 +100,85 @@ def main():
     precomputed_data_paths = path_list if config.num_samples is None else path_list[
         :config.num_samples]
 
-    standard_ious = []
-    augmented_SR_ious = []
-    max_SR_ious = []
-    mean_SR_ious = []
+    filenames = []
 
-    for filepath in tqdm(precomputed_data_paths):
+    image_array = tf.TensorArray(
+        tf.float32, size=0, dynamic_size=True, clear_after_read=False)
+    ground_truth = tf.TensorArray(
+        tf.float32, size=0, dynamic_size=True, clear_after_read=False)
+
+    for i, filepath in tqdm(enumerate(precomputed_data_paths)):
 
         try:
-            class_masks, max_masks, angles, shifts, filename = load_SR_data(
+            class_masks, _, angles, shifts, filename = load_SR_data(
                 filepath, num_aug=NUM_AUG, mode_slice=MODE_SLICE, global_normalize=True)
         except Exception:
             print(f"File: {filepath} is invalid, skipping...")
             continue
+
+        filenames.append(filename)
 
         true_mask_path = os.path.join(
             PASCAL_ROOT, "SegmentationClassAug", f"{filename}.png")
         true_mask = load_image(true_mask_path, image_size=IMG_SIZE, normalize=False,
                                is_png=True, resize_method="nearest")
 
-        standard_mask_path = os.path.join(
-            STANDARD_OUTPUT_DIR, f"{filename}.png")
-        standard_mask = load_image(standard_mask_path, image_size=IMG_SIZE, normalize=False, is_png=True,
-                                   resize_method="nearest")
+        target_augmented_SR, _ = superresolution_obj.augmented_superresolution(
+            class_masks, angles, shifts)
 
-        target_augmented_SR = compute_SR(superresolution_obj, class_masks, angles, shifts, filename, max_masks=max_masks, SR_type="aug",
-                                         save_output=SAVE_SLICE_OUTPUT, class_id=CLASS_ID, dest_folder=SUPERRES_OUTPUT_DIR)
+        image_array = image_array.write(i, target_augmented_SR)
+        ground_truth = ground_truth.write(i, true_mask)
 
-        target_max_SR = compute_SR(superresolution_obj, class_masks, angles, shifts, filename, max_masks=max_masks, SR_type="max",
-                                   save_output=SAVE_SLICE_OUTPUT, class_id=CLASS_ID, dest_folder=SUPERRES_OUTPUT_DIR)
+        # standard_mask_path = os.path.join(
+        #     STANDARD_OUTPUT_DIR, f"{filename}.png")
+        # standard_mask = load_image(standard_mask_path, image_size=IMG_SIZE, normalize=False, is_png=True,
+        #                            resize_method="nearest")
 
-        target_mean_SR = compute_SR(superresolution_obj, class_masks, angles, shifts, filename, max_masks=max_masks, SR_type="mean",
-                                    save_output=SAVE_SLICE_OUTPUT, class_id=CLASS_ID, dest_folder=SUPERRES_OUTPUT_DIR)
+        tf.keras.utils.save_img(
+            f"{TEST_FOLDER}/{filename}.png", image_array.read(i), scale=True)
 
-        standard_iou = compute_IoU(
-            true_mask, standard_mask, img_size=IMG_SIZE, class_id=CLASS_ID)
+    th_values = [round(v, 2) for v in np.arange(0.1, 0.95, step=0.05)]
+    data_list = []
 
-        augmented_SR_iou = compute_IoU(
-            true_mask, target_augmented_SR, img_size=IMG_SIZE, class_id=CLASS_ID)
+    for value in th_values:
+        ious = []
+        for z in range(image_array.size()):
 
-        max_SR_iou = compute_IoU(
-            true_mask, target_max_SR, img_size=IMG_SIZE, class_id=CLASS_ID)
+            th_mask = threshold_image(
+                image_array.read(z), CLASS_ID, th_factor=value)
+            augmented_SR_iou = compute_IoU(
+                ground_truth.read(z), th_mask, img_size=IMG_SIZE, class_id=CLASS_ID)
 
-        mean_SR_iou = compute_IoU(
-            true_mask, target_mean_SR, img_size=IMG_SIZE, class_id=CLASS_ID)
+            ious.append(augmented_SR_iou)
+            # tf.keras.utils.save_img(
+            #     f"{TEST_FOLDER}/{filenames[z]}_th_{value}.png", th_mask, scale=True)
 
-        standard_ious.append(standard_iou)
-        augmented_SR_ious.append(augmented_SR_iou)
-        max_SR_ious.append(max_SR_iou)
-        mean_SR_ious.append(mean_SR_iou)
+        avg_iou = np.mean(ious)
+        data_list.append({
+            "Th Value": value,
+            "IoU": avg_iou
+        })
+        print(f"Th Value: {value}, IoU: {avg_iou}")
 
-    avg_standard_iou = np.mean(standard_ious)
-    avg_augmented_SR_iou = np.mean(augmented_SR_ious)
-    avg_max_SR_iou = np.mean(max_SR_ious)
-    avg_mean_SR_iou = np.mean(mean_SR_ious)
+    df = pd.DataFrame(data_list)
+    print(df)
+    print("Done")
+    # standard_iou = compute_IoU(
+    #     true_mask, standard_mask, img_size=IMG_SIZE, class_id=CLASS_ID)
 
-    print(
-        f"Avg. Standard IoUs: {avg_standard_iou},  Avg. Augmented SR IoUs: {avg_augmented_SR_iou}")
+    #     standard_ious.append(standard_iou)
+    #     augmented_SR_ious.append(augmented_SR_iou)
 
-    print(
-        f"Avg. Max SR IoUs: {avg_max_SR_iou}, Avg. Mean SR IoUs: {avg_mean_SR_iou}")
+    # avg_standard_iou = np.mean(standard_ious)
+    # avg_augmented_SR_iou = np.mean(augmented_SR_ious)
 
-    wandb.log({"mean_superres_iou": avg_augmented_SR_iou,
-               "mean_standard_iou": avg_standard_iou})
+    # print(
+    #     f"Avg. Standard IoUs: {avg_standard_iou},  Avg. Augmented SR IoUs: {avg_augmented_SR_iou}")
 
-    wandb.finish()
+    # wandb.log({"mean_superres_iou": avg_augmented_SR_iou,
+    #            "mean_standard_iou": avg_standard_iou})
+
+    # wandb.finish()
 
 
 if __name__ == '__main__':
