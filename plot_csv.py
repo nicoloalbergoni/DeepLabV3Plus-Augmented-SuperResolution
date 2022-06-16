@@ -1,4 +1,3 @@
-from cProfile import run
 import os
 import numpy as np
 import pandas as pd
@@ -6,7 +5,7 @@ from mpl_toolkits import mplot3d
 from matplotlib import pyplot as plt
 
 ROOT_FOLDER = os.path.join(os.getcwd(), "robustness_check")
-CSV_PATH = os.path.join(ROOT_FOLDER, "robustness_check_small_angles.csv")
+CSV_PATH = os.path.join(ROOT_FOLDER, "robustness_300_small_angles.csv")
 
 
 def plot3d(x, y, z, save_path):
@@ -27,6 +26,8 @@ def plot2d(x, y, save_path, z=None):
         plt.colorbar()
     else:
         plt.scatter(x, y, cmap="Reds")
+
+    plt.xticks(np.arange(x.min(), x.max() + 0.1, 0.1))
     plt.xlabel("Angles")
     plt.ylabel("Avg. Mean IoU")
 
@@ -37,10 +38,10 @@ def main():
     df = pd.read_csv(CSV_PATH)
 
     runs = np.arange(0, 7**3, step=1)
-    angles = df["Angle"].to_numpy()
-    shift_x = df["Shift X"].to_numpy()
-    shift_y = df["Shift Y"].to_numpy()
-    avg_iou = df["Avg. Mean IoU"].to_numpy()
+    angles = df.iloc[:, 1].to_numpy()
+    shift_x = df.iloc[:, 2].to_numpy()
+    shift_y = df.iloc[:, 3].to_numpy()
+    avg_iou = df.iloc[:, 4].to_numpy()
 
     total_shift = np.add(shift_x, shift_y)
 
