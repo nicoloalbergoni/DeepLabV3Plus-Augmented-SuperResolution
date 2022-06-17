@@ -22,7 +22,7 @@ FEATURE_SIZE = (128, 128)
 NUM_AUG = 100
 CLASS_ID = 8
 NUM_SAMPLES = 500
-MODE_SLICE = False
+MODE = "slice_var"
 MODEL_BACKBONE = "xception"
 USE_VALIDATION = False
 
@@ -33,7 +33,7 @@ IMGS_PATH = os.path.join(PASCAL_ROOT, "JPEGImages")
 SUPERRES_ROOT = os.path.join(DATA_DIR, "superres_root")
 AUGMENTED_COPIES_ROOT = os.path.join(SUPERRES_ROOT, "augmented_copies")
 PRECOMPUTED_OUTPUT_DIR = os.path.join(
-    AUGMENTED_COPIES_ROOT, f"{MODEL_BACKBONE}_{'slice' if MODE_SLICE else 'argmax'}_{NUM_AUG}{'_validation' if USE_VALIDATION else ''}")
+    AUGMENTED_COPIES_ROOT, f"{MODEL_BACKBONE}_{MODE}_{NUM_AUG}{'_validation' if USE_VALIDATION else ''}")
 STANDARD_OUTPUT_ROOT = os.path.join(SUPERRES_ROOT, "standard_output")
 STANDARD_OUTPUT_DIR = os.path.join(
     STANDARD_OUTPUT_ROOT, f"{MODEL_BACKBONE}{'_validation' if USE_VALIDATION else ''}")
@@ -98,7 +98,7 @@ def main():
 
         try:
             class_masks, max_masks, angles, shifts, filename = load_SR_data(
-                filepath, num_aug=NUM_AUG, mode_slice=MODE_SLICE, global_normalize=True)
+                filepath, num_aug=NUM_AUG, global_normalize=True)
         except Exception:
             print(f"File: {filepath} is invalid, skipping...")
             continue
@@ -114,11 +114,11 @@ def main():
                                    resize_method="nearest")
 
         target_augmented_SR = compute_SR(superresolution_obj, class_masks, angles, shifts, filename, max_masks=max_masks, SR_type="aug",
-                                         save_output=False, class_id=CLASS_ID, dest_folder=SUPERRES_OUTPUT_DIR)
+                                         save_output=False, class_id=CLASS_ID, dest_folder=SUPERRES_OUTPUT_DIR, th_factor=.15)
         target_max_SR = compute_SR(superresolution_obj, class_masks, angles, shifts, filename, max_masks=max_masks, SR_type="max",
-                                   save_output=False, class_id=CLASS_ID, dest_folder=SUPERRES_OUTPUT_DIR)
+                                   save_output=False, class_id=CLASS_ID, dest_folder=SUPERRES_OUTPUT_DIR, th_factor=.15)
         target_mean_SR = compute_SR(superresolution_obj, class_masks, angles, shifts, filename, max_masks=max_masks, SR_type="mean",
-                                    save_output=False, class_id=CLASS_ID, dest_folder=SUPERRES_OUTPUT_DIR)
+                                    save_output=False, class_id=CLASS_ID, dest_folder=SUPERRES_OUTPUT_DIR, th_factor=.15)
 
         standard_iou = compute_IoU(
             true_mask, standard_mask, img_size=IMG_SIZE, class_id=CLASS_ID)

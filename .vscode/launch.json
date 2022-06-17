@@ -38,13 +38,15 @@
         "100",
         "--num_samples",
         "500",
-        // "--mode_slice",
+        "--mode",
+        "slice_var",
         "--angle_max",
         "0.2",
         "--shift_max",
         "5",
         "--backbone",
-        "xception"
+        "xception",
+        // "--standard_output"
       ]
     },
     {
