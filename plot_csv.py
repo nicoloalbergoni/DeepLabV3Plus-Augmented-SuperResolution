@@ -5,14 +5,15 @@ import pandas as pd
 from mpl_toolkits import mplot3d
 from matplotlib import pyplot as plt
 
-ROOT_FOLDER = os.path.join(os.getcwd(), "robustness_check")
-CSV_PATH = os.path.join(ROOT_FOLDER, "robustness_check_small_angles.csv")
+DATA_DIR = os.path.join(os.getcwd(), "data")
+ROOT_FOLDER = os.path.join(DATA_DIR, "robustness_check")
+CSV_PATH = os.path.join(ROOT_FOLDER, "robustness_check.csv")
 
 
 def plot3d(x, y, z, save_path):
     plt.figure(figsize=(8, 8))
     ax = plt.axes(projection="3d")
-    ax.scatter(x, y, z, c=z, cmap="Reds")
+    ax.scatter(x, y, z, c=z, cmap="jet")
     ax.set_xlabel("Angle")
     ax.set_ylabel("Total shift")
     ax.set_zlabel("Avg. Mean IoU")
@@ -23,10 +24,14 @@ def plot2d(x, y, save_path, z=None):
     plt.figure()
     plt.axes()
     if z is not None:
-        plt.scatter(x, y, c=z, cmap="Reds")
-        plt.colorbar()
+        sct = plt.scatter(x, y, c=z, cmap="jet")
+        plt.xticks(np.unique(x))
+        clb = plt.colorbar()
+        clb.ax.set_title("Total Shift")
+        plt.axhline(np.max(y))
+        plt.text(0.5, np.max(y), np.max(y))
     else:
-        plt.scatter(x, y, cmap="Reds")
+        plt.scatter(x, y, cmap="jet")
     plt.xlabel("Angles")
     plt.ylabel("Avg. Mean IoU")
 

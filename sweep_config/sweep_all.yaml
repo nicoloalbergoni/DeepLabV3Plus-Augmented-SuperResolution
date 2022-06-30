@@ -1,5 +1,5 @@
 entity: albergoni-nicolo
-project: Argmax (xception)
+project: Slice var
 program: sweep_script.py
 method: bayes
 metric:
@@ -26,9 +26,16 @@ parameters:
     distribution: q_uniform
     q: 0.1
   num_iter:
-    value: 300
+    values:
+      - 300
+      - 400
+      - 500
+      - 600
   optimizer:
-    value: "adam"
+    values: 
+      - "adam"
+      - "adagrad"
+      - "adadelta"
   lr_scheduler:
     value: True
   decay_rate:
@@ -38,18 +45,21 @@ parameters:
     q: 0.05
   decay_steps:
     max: 100
-    min: 10
+    min: 20
     distribution: q_uniform
-    q: 10
+    q: 20
   learning_rate:
     values:
       - 1e-2
       - 1e-3 
       - 1e-1
+      - 1e-4
   use_BTV:
     values:
       - True
       - False 
+  amsgrad:
+    value: False
 #command:
 #- ${env}
 #- C:\Users\alber\Desktop\DeepLabV3Plus-Augmented-SuperResolution\venv\Scripts\python.exe

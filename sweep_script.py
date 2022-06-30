@@ -8,7 +8,7 @@ from superresolution_scripts.optimizer import Optimizer
 from utils import load_image, compute_IoU
 from superresolution_scripts.superres_utils import list_precomputed_data_paths, load_SR_data, compute_SR, normalize_coefficients
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 SEED = 1234
 
@@ -21,10 +21,12 @@ IMG_SIZE = (512, 512)
 FEATURE_SIZE = (128, 128)
 NUM_AUG = 100
 CLASS_ID = 8
-NUM_SAMPLES = 500
+NUM_SAMPLES = 300
 MODE = "slice_var"
 MODEL_BACKBONE = "xception"
 USE_VALIDATION = False
+SAVE_SLICE_OUTPUT = False
+TH_FACTOR = 0.7
 
 DATA_DIR = os.path.join(os.getcwd(), "data")
 PASCAL_ROOT = os.path.join(DATA_DIR, "dataset_root", "VOCdevkit", "VOC2012")
@@ -43,7 +45,7 @@ SUPERRES_OUTPUT_DIR = os.path.join(
 
 def main():
     hyperparamters_default = {
-        "lambda_df": 0.46,
+        "lambda_df": 1,
         "lambda_tv": 4.75,
         "lambda_L2": 0.11,
         "lambda_L1": 0.0,
@@ -114,11 +116,11 @@ def main():
                                    resize_method="nearest")
 
         target_augmented_SR = compute_SR(superresolution_obj, class_masks, angles, shifts, filename, max_masks=max_masks, SR_type="aug",
-                                         save_output=False, class_id=CLASS_ID, dest_folder=SUPERRES_OUTPUT_DIR, th_factor=.15)
+                                         save_output=SAVE_SLICE_OUTPUT, class_id=CLASS_ID, dest_folder=SUPERRES_OUTPUT_DIR, th_factor=TH_FACTOR)
         target_max_SR = compute_SR(superresolution_obj, class_masks, angles, shifts, filename, max_masks=max_masks, SR_type="max",
-                                   save_output=False, class_id=CLASS_ID, dest_folder=SUPERRES_OUTPUT_DIR, th_factor=.15)
+                                   save_output=SAVE_SLICE_OUTPUT, class_id=CLASS_ID, dest_folder=SUPERRES_OUTPUT_DIR, th_factor=TH_FACTOR)
         target_mean_SR = compute_SR(superresolution_obj, class_masks, angles, shifts, filename, max_masks=max_masks, SR_type="mean",
-                                    save_output=False, class_id=CLASS_ID, dest_folder=SUPERRES_OUTPUT_DIR, th_factor=.15)
+                                    save_output=SAVE_SLICE_OUTPUT, class_id=CLASS_ID, dest_folder=SUPERRES_OUTPUT_DIR, th_factor=TH_FACTOR)
 
         standard_iou = compute_IoU(
             true_mask, standard_mask, img_size=IMG_SIZE, class_id=CLASS_ID)

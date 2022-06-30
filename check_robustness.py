@@ -24,7 +24,7 @@ tf.random.set_seed(SEED)
 
 IMG_SIZE = (512, 512)
 CLASS_ID = 8
-NUM_SAMPLES = 300
+NUM_SAMPLES = 500
 MODEL_BACKBONE = "xception"
 USE_VALIDATION = False
 BATCH_SIZE = 16
@@ -95,14 +95,14 @@ def main():
         reshape_outputs=False,
         alpha=1.).build_model()
 
-    # angle_values = [round(angle, 2) for angle in np.linspace(0.0, 3.14, num=7)]
+    angle_values = [round(angle, 2) for angle in np.linspace(0.0, 3.14, num=9)]
+    shift_x_values = np.linspace(0, 90, num=7, dtype=int)
+    shift_y_values = np.linspace(0, 90, num=7, dtype=int)
+
+    # angle_values = [round(angle, 2)
+    #                 for angle in np.arange(-0.5, 0.6, step=0.1)]
     # shift_x_values = np.linspace(0, 60, num=7, dtype=int)
     # shift_y_values = np.linspace(0, 60, num=7, dtype=int)
-
-    angle_values = [round(angle, 2)
-                    for angle in np.arange(-0.5, 0.6, step=0.1)]
-    shift_x_values = np.linspace(0, 60, num=7, dtype=int)
-    shift_y_values = np.linspace(0, 60, num=7, dtype=int)
 
     all_combinations = list(itertools.product(
         angle_values, shift_x_values, shift_y_values))
@@ -111,7 +111,7 @@ def main():
 
     for i, (angle, shift_x, shift_y) in tqdm(enumerate(all_combinations)):
 
-        wandb.init(project="Robustness check (300 samples, Small angles)",
+        wandb.init(project="Robustness check (500 samples)",
                    entity="albergoni-nicolo")
 
         aug_images = augment_images(images, angle, shift_x, shift_y)

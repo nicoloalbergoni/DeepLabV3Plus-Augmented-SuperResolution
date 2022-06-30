@@ -20,7 +20,7 @@
       "console": "integratedTerminal",
       "justMyCode": true,
       "env": {
-        "CUDA_VISIBLE_DEVICES": "0"
+        "CUDA_VISIBLE_DEVICES": "1"
       }
     },
     {
@@ -31,7 +31,7 @@
       "console": "integratedTerminal",
       "justMyCode": true,
       "env": {
-        "CUDA_VISIBLE_DEVICES": "0"
+        "CUDA_VISIBLE_DEVICES": "1"
       },
       "args": [
         "--num_aug",
@@ -39,11 +39,11 @@
         "--num_samples",
         "500",
         "--mode",
-        "slice_var",
+        "argmax",
         "--angle_max",
-        "0.2",
+        "0.15",
         "--shift_max",
-        "5",
+        "20",
         "--backbone",
         "xception",
         // "--standard_output"

@@ -1,5 +1,5 @@
 entity: albergoni-nicolo
-project: Argmax 0.2 angle 5 shift (500 samples)
+project: Slice Var no L1 no coeff norm
 program: sweep_script.py
 method: bayes
 metric:
@@ -17,9 +17,7 @@ parameters:
     min: 0.0
     distribution: uniform
   lambda_L1:
-    max: 1
-    min: 0.0
-    distribution: uniform
+    value: 0
   num_iter:
     value: 300
   optimizer:
@@ -33,10 +31,7 @@ parameters:
   learning_rate:
     value: 1e-3     
   copy_dropout:
-    max: 0.4
-    min: 0.0
-    distribution: q_uniform
-    q: 0.1
+    value: 0
   use_BTV:
     value: False
   amsgrad:
