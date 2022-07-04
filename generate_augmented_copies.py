@@ -33,6 +33,9 @@ parser.add_argument("--backbone", help="Either mobilenet or xception, specifies 
 parser.add_argument("--standard_output",
                     help="Compute standard network output", action="store_true")
 
+parser.add_argument("--use_validation",
+                    help="Create data from validation set", action="store_true")
+
 args = parser.parse_args()
 
 
@@ -51,7 +54,7 @@ SHIFT_MAX = args.shift_max
 MODE = args.mode
 MODEL_BACKBONE = args.backbone
 COMPUTE_STANDARD_OUTPUT = args.standard_output
-USE_VALIDATION = False
+USE_VALIDATION = args.use_validation
 
 DATA_DIR = os.path.join(os.getcwd(), "data")
 PASCAL_ROOT = os.path.join(DATA_DIR, "dataset_root", "VOCdevkit", "VOC2012")

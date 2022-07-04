@@ -46,7 +46,8 @@
         "20",
         "--backbone",
         "xception",
-        // "--standard_output"
+        "--standard_output",
+        "--use_validation"
       ]
     },
     {

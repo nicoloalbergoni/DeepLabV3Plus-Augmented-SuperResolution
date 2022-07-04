@@ -20,11 +20,13 @@ IMG_SIZE = (512, 512)
 FEATURE_SIZE = (128, 128)
 NUM_AUG = 100
 CLASS_ID = 8
-NUM_SAMPLES = 10
+NUM_SAMPLES = 100
+TH_FACTOR = 0.2
 
-MODE = "slice_var"
+
+MODE = "argmax"
 MODEL_BACKBONE = "xception"
-USE_VALIDATION = False
+USE_VALIDATION = True
 SAVE_SLICE_OUTPUT = True
 
 DATA_DIR = os.path.join(os.getcwd(), "data")
@@ -45,26 +47,26 @@ SUPERRES_OUTPUT_DIR = os.path.join(
 def main():
     hyperparamters_default = {
         "lambda_df": 1.0,
-        "lambda_tv": 0.79,
-        "lambda_L2": 0.085,
-        "lambda_L1": 0.0022,
+        "lambda_tv": 0.876,
+        "lambda_L2": 0.0039,
+        "lambda_L1": 0.0,
         "num_iter": 300,
         "num_aug": NUM_AUG,
         "num_samples": NUM_SAMPLES,
-        "copy_dropout": 0.2,
+        "copy_dropout": 0.1,
         "use_BTV": False,
         "optimizer": "adam",
-        "learning_rate": 1e-3,
+        "learning_rate": 1e-2,
         "beta_1": 0.9,
         "beta_2": 0.999,
         "epsilon": 1e-7,
-        "amsgrad": True,
+        "amsgrad": False,
         "initial_accumulator_value": 0.1,
         "nesterov": True,
         "momentum": 0.2,
         "lr_scheduler": True,
-        "decay_steps": 50,
-        "decay_rate": 0.5,
+        "decay_steps": 90,
+        "decay_rate": 0.6,
     }
 
     wandb_dir = os.path.join(DATA_DIR, "wandb_logs")
@@ -122,13 +124,13 @@ def main():
                                    resize_method="nearest")
 
         target_augmented_SR = compute_SR(superresolution_obj, class_masks, angles, shifts, filename, max_masks=max_masks, SR_type="aug",
-                                         save_output=SAVE_SLICE_OUTPUT, class_id=CLASS_ID, dest_folder=SUPERRES_OUTPUT_DIR, th_factor=.15)
+                                         save_output=SAVE_SLICE_OUTPUT, class_id=CLASS_ID, dest_folder=SUPERRES_OUTPUT_DIR, th_factor=TH_FACTOR)
 
         target_max_SR = compute_SR(superresolution_obj, class_masks, angles, shifts, filename, max_masks=max_masks, SR_type="max",
-                                   save_output=SAVE_SLICE_OUTPUT, class_id=CLASS_ID, dest_folder=SUPERRES_OUTPUT_DIR, th_factor=.15)
+                                   save_output=SAVE_SLICE_OUTPUT, class_id=CLASS_ID, dest_folder=SUPERRES_OUTPUT_DIR, th_factor=TH_FACTOR)
 
         target_mean_SR = compute_SR(superresolution_obj, class_masks, angles, shifts, filename, max_masks=max_masks, SR_type="mean",
-                                    save_output=SAVE_SLICE_OUTPUT, class_id=CLASS_ID, dest_folder=SUPERRES_OUTPUT_DIR, th_factor=.15)
+                                    save_output=SAVE_SLICE_OUTPUT, class_id=CLASS_ID, dest_folder=SUPERRES_OUTPUT_DIR, th_factor=TH_FACTOR)
 
         standard_iou = compute_IoU(
             true_mask, standard_mask, img_size=IMG_SIZE, class_id=CLASS_ID)
