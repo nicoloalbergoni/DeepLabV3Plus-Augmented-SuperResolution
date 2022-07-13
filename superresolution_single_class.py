@@ -14,11 +14,12 @@ np.random.seed(SEED)
 tf.random.set_seed(SEED)
 
 tf.config.run_functions_eagerly(True)
-# os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 IMG_SIZE = (512, 512)
 FEATURE_SIZE = (128, 128)
-NUM_AUG = 100
+NUM_AUG_FOLDER = 100
+NUM_AUG = 10
 CLASS_ID = 8
 NUM_SAMPLES = 100
 TH_FACTOR = 0.2
@@ -36,7 +37,7 @@ IMGS_PATH = os.path.join(PASCAL_ROOT, "JPEGImages")
 SUPERRES_ROOT = os.path.join(DATA_DIR, "superres_root")
 AUGMENTED_COPIES_ROOT = os.path.join(SUPERRES_ROOT, "augmented_copies")
 PRECOMPUTED_OUTPUT_DIR = os.path.join(
-    AUGMENTED_COPIES_ROOT, f"{MODEL_BACKBONE}_{MODE}_{NUM_AUG}{'_validation' if USE_VALIDATION else ''}")
+    AUGMENTED_COPIES_ROOT, f"{MODEL_BACKBONE}_{MODE}_{NUM_AUG_FOLDER}{'_validation' if USE_VALIDATION else ''}")
 STANDARD_OUTPUT_ROOT = os.path.join(SUPERRES_ROOT, "standard_output")
 STANDARD_OUTPUT_DIR = os.path.join(
     STANDARD_OUTPUT_ROOT, f"{MODEL_BACKBONE}{'_validation' if USE_VALIDATION else ''}")
@@ -47,16 +48,16 @@ SUPERRES_OUTPUT_DIR = os.path.join(
 def main():
     hyperparamters_default = {
         "lambda_df": 1.0,
-        "lambda_tv": 0.876,
-        "lambda_L2": 0.0039,
-        "lambda_L1": 0.0,
+        "lambda_tv": 0.82,
+        "lambda_L2": 0.93,
+        "lambda_L1": 0.44,
         "num_iter": 300,
         "num_aug": NUM_AUG,
         "num_samples": NUM_SAMPLES,
-        "copy_dropout": 0.1,
+        "copy_dropout": 0.0,
         "use_BTV": False,
         "optimizer": "adam",
-        "learning_rate": 1e-2,
+        "learning_rate": 1e-3,
         "beta_1": 0.9,
         "beta_2": 0.999,
         "epsilon": 1e-7,
@@ -65,8 +66,8 @@ def main():
         "nesterov": True,
         "momentum": 0.2,
         "lr_scheduler": True,
-        "decay_steps": 90,
-        "decay_rate": 0.6,
+        "decay_steps": 60,
+        "decay_rate": 0.3,
     }
 
     wandb_dir = os.path.join(DATA_DIR, "wandb_logs")
@@ -87,6 +88,7 @@ def main():
     }
 
     coeff_dict = normalize_coefficients(coeff_dict)
+    print(coeff_dict)
 
     optimizer_obj = Optimizer(optimizer=config.optimizer, learning_rate=config.learning_rate, epsilon=config.epsilon, beta_1=config.beta_1, beta_2=config.beta_2,
                               amsgrad=config.amsgrad, initial_accumulator_value=config.initial_accumulator_value, momentum=config.momentum, nesterov=config.nesterov,

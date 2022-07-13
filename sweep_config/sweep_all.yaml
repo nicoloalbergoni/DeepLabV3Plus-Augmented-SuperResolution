@@ -1,5 +1,5 @@
 entity: albergoni-nicolo
-project: Slice var
+project: Argmax 500 sweep all
 program: sweep_script.py
 method: bayes
 metric:

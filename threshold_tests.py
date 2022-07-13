@@ -23,7 +23,7 @@ NUM_AUG = 100
 CLASS_ID = 8
 NUM_SAMPLES = 300
 
-MODE = "argmax"
+MODE = "slice_var"
 MODEL_BACKBONE = "xception"
 USE_VALIDATION = False
 SAVE_SLICE_OUTPUT = False
@@ -48,13 +48,13 @@ OUTPUT_FOLDER = os.path.join(DATA_DIR, "threshold_test")
 def main():
     hyperparamters_default = {
         "lambda_df": 1.0,
-        "lambda_tv": 0.876,
-        "lambda_L2": 0.0039,
-        "lambda_L1": 0.0,
+        "lambda_tv": 0.84,
+        "lambda_L2": 0.047,
+        "lambda_L1": 0.0065,
         "num_iter": 300,
         "num_aug": NUM_AUG,
         "num_samples": NUM_SAMPLES,
-        "copy_dropout": 0.1,
+        "copy_dropout": 0.2,
         "use_BTV": False,
         "optimizer": "adam",
         "learning_rate": 1e-2,
@@ -66,8 +66,8 @@ def main():
         "nesterov": True,
         "momentum": 0.2,
         "lr_scheduler": True,
-        "decay_steps": 90,
-        "decay_rate": 0.6,
+        "decay_steps": 100,
+        "decay_rate": 0.65,
     }
 
     wandb_dir = os.path.join(DATA_DIR, "wandb_logs")

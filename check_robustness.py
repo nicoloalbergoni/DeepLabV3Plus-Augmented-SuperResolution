@@ -2,6 +2,7 @@ import os
 import wandb
 import random
 import gc
+import csv
 import itertools
 import numpy as np
 from tqdm import tqdm
@@ -33,7 +34,9 @@ DATA_DIR = os.path.join(os.getcwd(), "data")
 PASCAL_ROOT = os.path.join(DATA_DIR, "dataset_root", "VOCdevkit", "VOC2012")
 IMGS_PATH = os.path.join(PASCAL_ROOT, "JPEGImages")
 
-DEST_FOLDER = os.path.join(DATA_DIR, "robustness_check_output")
+
+DEST_FOLDER = os.path.join(DATA_DIR, "robustness_check")
+IMAGE_OUTPUT_FOLDER = os.path.join(DEST_FOLDER, "image_output")
 
 
 def augment_images(images, angle, shift_x, shift_y, interpolation="bilinear"):
@@ -68,8 +71,8 @@ def save_plot(input_image, prediction, ground_truth, plot_title, save_path):
 
 def main():
 
-    if not os.path.exists(DEST_FOLDER):
-        os.makedirs(DEST_FOLDER)
+    if not os.path.exists(IMAGE_OUTPUT_FOLDER):
+        os.makedirs(IMAGE_OUTPUT_FOLDER)
 
     image_list_path = os.path.join(DATA_DIR, "augmented_file_lists",
                                    f"{'valaug' if USE_VALIDATION else 'trainaug'}.txt")
@@ -95,24 +98,28 @@ def main():
         reshape_outputs=False,
         alpha=1.).build_model()
 
-    angle_values = [round(angle, 2) for angle in np.linspace(0.0, 3.14, num=9)]
-    shift_x_values = np.linspace(0, 90, num=9, dtype=int)
-    shift_y_values = np.linspace(0, 90, num=9, dtype=int)
+    # angle_values = [round(angle, 2) for angle in np.linspace(0.0, 3.14, num=9)]
+    # shift_x_values = np.linspace(0, 80, num=9, dtype=int)
+    # shift_y_values = np.linspace(0, 80, num=9, dtype=int)
 
-    # angle_values = [round(angle, 2)
-    #                 for angle in np.arange(-0.5, 0.6, step=0.1)]
-    # shift_x_values = np.linspace(0, 60, num=7, dtype=int)
-    # shift_y_values = np.linspace(0, 60, num=7, dtype=int)
+    angle_values = [round(angle, 2)
+                    for angle in np.arange(-1.0, 1.05, step=0.05)]
+    shift_x_values = np.linspace(0, 80, num=9, dtype=int)
+    shift_y_values = np.linspace(0, 80, num=9, dtype=int)
 
     all_combinations = list(itertools.product(
         angle_values, shift_x_values, shift_y_values))
 
-    # wandb.init(project="Robustness check", entity="albergoni-nicolo")
+    csv_header = ["Angle", "Shift_X", "Shift_Y", "IoU"]
+    csv_path = f"{DEST_FOLDER}/robustness_small_{NUM_SAMPLES}.csv"
+    f = open(csv_path, "w")
+    writer = csv.writer(f, delimiter=',', quotechar='"', quoting=csv.QUOTE_ALL)
+    writer.writerow(csv_header)
 
     for i, (angle, shift_x, shift_y) in tqdm(enumerate(all_combinations)):
 
-        wandb.init(project="Robustness check (350 samples, N=9)",
-                   entity="albergoni-nicolo")
+        # wandb.init(project="Robustness check (350 samples, N=9)",
+        #            entity="albergoni-nicolo")
 
         aug_images = augment_images(images, angle, shift_x, shift_y)
         aug_gt = augment_images(
@@ -125,29 +132,31 @@ def main():
 
         for k, pred in enumerate(predictions):
             image_name = os.path.splitext(os.path.basename(image_paths[k]))[0]
-            save_path = os.path.join(DEST_FOLDER, f"{image_name}.png")
+            save_path = os.path.join(IMAGE_OUTPUT_FOLDER, f"{image_name}.png")
             iou = round(compute_IoU(aug_gt[k], pred), 3)
 
-            plot_title = f"mIoU: {iou}, Angle: {angle}, Shift X: {shift_x}, Shift Y: {shift_y}"
-            save_plot(aug_images[k], create_mask(
-                pred), aug_gt[k], plot_title, save_path)
+            # plot_title = f"mIoU: {iou}, Angle: {angle}, Shift X: {shift_x}, Shift Y: {shift_y}"
+            # save_plot(aug_images[k], create_mask(
+            #     pred), aug_gt[k], plot_title, save_path)
 
             ious.append(iou)
 
         avg_mean_iou = round(np.mean(ious), 3)
 
         print(
-            f"Angle: {angle}, Shift X: {shift_x}, Shift Y: {shift_y}, Mean IoU: {avg_mean_iou}")
+            f"Angle: {angle}, Shift X: {shift_x}, Shift Y: {shift_y}, IoU: {avg_mean_iou}")
+        writer.writerow([angle, shift_x, shift_y, avg_mean_iou])
+        f.flush()
+        # wandb.log({
+        #     "Angle": angle,
+        #     "Shift_X": shift_x,
+        #     "Shift_Y": shift_y,
+        #     "IoU": avg_mean_iou
+        # })
 
-        wandb.log({
-            "Angle": angle,
-            "Shift_X": shift_x,
-            "Shift_Y": shift_y,
-            "IoU": avg_mean_iou
-        })
+        # wandb.finish(quiet=True)
 
-        wandb.finish(quiet=True)
-
+    f.close()
     print("Done")
 
 
