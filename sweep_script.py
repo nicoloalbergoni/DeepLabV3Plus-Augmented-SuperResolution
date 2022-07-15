@@ -8,7 +8,7 @@ from superresolution_scripts.optimizer import Optimizer
 from utils import load_image, compute_IoU
 from superresolution_scripts.superres_utils import list_precomputed_data_paths, load_SR_data, compute_SR, normalize_coefficients
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 SEED = 1234
 
@@ -22,9 +22,11 @@ FEATURE_SIZE = (128, 128)
 NUM_AUG = 100
 CLASS_ID = 8
 NUM_SAMPLES = 500
-MODE_SLICE = False
+MODE = "argmax"
 MODEL_BACKBONE = "xception"
 USE_VALIDATION = False
+SAVE_SLICE_OUTPUT = False
+TH_FACTOR = 0.2
 
 DATA_DIR = os.path.join(os.getcwd(), "data")
 PASCAL_ROOT = os.path.join(DATA_DIR, "dataset_root", "VOCdevkit", "VOC2012")
@@ -33,7 +35,7 @@ IMGS_PATH = os.path.join(PASCAL_ROOT, "JPEGImages")
 SUPERRES_ROOT = os.path.join(DATA_DIR, "superres_root")
 AUGMENTED_COPIES_ROOT = os.path.join(SUPERRES_ROOT, "augmented_copies")
 PRECOMPUTED_OUTPUT_DIR = os.path.join(
-    AUGMENTED_COPIES_ROOT, f"{MODEL_BACKBONE}_{'slice' if MODE_SLICE else 'argmax'}_{NUM_AUG}{'_validation' if USE_VALIDATION else ''}")
+    AUGMENTED_COPIES_ROOT, f"{MODEL_BACKBONE}_{MODE}_{NUM_AUG}{'_validation' if USE_VALIDATION else ''}")
 STANDARD_OUTPUT_ROOT = os.path.join(SUPERRES_ROOT, "standard_output")
 STANDARD_OUTPUT_DIR = os.path.join(
     STANDARD_OUTPUT_ROOT, f"{MODEL_BACKBONE}{'_validation' if USE_VALIDATION else ''}")
@@ -43,7 +45,7 @@ SUPERRES_OUTPUT_DIR = os.path.join(
 
 def main():
     hyperparamters_default = {
-        "lambda_df": 0.46,
+        "lambda_df": 1,
         "lambda_tv": 4.75,
         "lambda_L2": 0.11,
         "lambda_L1": 0.0,
@@ -98,7 +100,7 @@ def main():
 
         try:
             class_masks, max_masks, angles, shifts, filename = load_SR_data(
-                filepath, num_aug=NUM_AUG, mode_slice=MODE_SLICE, global_normalize=True)
+                filepath, num_aug=NUM_AUG, global_normalize=True)
         except Exception:
             print(f"File: {filepath} is invalid, skipping...")
             continue
@@ -114,11 +116,11 @@ def main():
                                    resize_method="nearest")
 
         target_augmented_SR = compute_SR(superresolution_obj, class_masks, angles, shifts, filename, max_masks=max_masks, SR_type="aug",
-                                         save_output=False, class_id=CLASS_ID, dest_folder=SUPERRES_OUTPUT_DIR)
+                                         save_output=SAVE_SLICE_OUTPUT, class_id=CLASS_ID, dest_folder=SUPERRES_OUTPUT_DIR, th_factor=TH_FACTOR)
         target_max_SR = compute_SR(superresolution_obj, class_masks, angles, shifts, filename, max_masks=max_masks, SR_type="max",
-                                   save_output=False, class_id=CLASS_ID, dest_folder=SUPERRES_OUTPUT_DIR)
+                                   save_output=SAVE_SLICE_OUTPUT, class_id=CLASS_ID, dest_folder=SUPERRES_OUTPUT_DIR, th_factor=TH_FACTOR)
         target_mean_SR = compute_SR(superresolution_obj, class_masks, angles, shifts, filename, max_masks=max_masks, SR_type="mean",
-                                    save_output=False, class_id=CLASS_ID, dest_folder=SUPERRES_OUTPUT_DIR)
+                                    save_output=SAVE_SLICE_OUTPUT, class_id=CLASS_ID, dest_folder=SUPERRES_OUTPUT_DIR, th_factor=TH_FACTOR)
 
         standard_iou = compute_IoU(
             true_mask, standard_mask, img_size=IMG_SIZE, class_id=CLASS_ID)

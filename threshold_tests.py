@@ -7,23 +7,23 @@ import tensorflow as tf
 from superresolution_scripts.superresolution import Superresolution
 from superresolution_scripts.optimizer import Optimizer
 from utils import load_image, compute_IoU
-from superresolution_scripts.superres_utils import list_precomputed_data_paths, load_SR_data, compute_SR, normalize_coefficients, threshold_image
+from superresolution_scripts.superres_utils import list_precomputed_data_paths, load_SR_data, normalize_coefficients, threshold_image
 
 SEED = 1234
 
 np.random.seed(SEED)
 tf.random.set_seed(SEED)
 
-tf.config.run_functions_eagerly(True)
+# tf.config.run_functions_eagerly(True)
 # os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 IMG_SIZE = (512, 512)
 FEATURE_SIZE = (128, 128)
 NUM_AUG = 100
 CLASS_ID = 8
-NUM_SAMPLES = 50
+NUM_SAMPLES = 500
 
-MODE_SLICE = False
+MODE = "slice_var"
 MODEL_BACKBONE = "xception"
 USE_VALIDATION = False
 SAVE_SLICE_OUTPUT = False
@@ -35,7 +35,7 @@ IMGS_PATH = os.path.join(PASCAL_ROOT, "JPEGImages")
 SUPERRES_ROOT = os.path.join(DATA_DIR, "superres_root")
 AUGMENTED_COPIES_ROOT = os.path.join(SUPERRES_ROOT, "augmented_copies")
 PRECOMPUTED_OUTPUT_DIR = os.path.join(
-    AUGMENTED_COPIES_ROOT, f"{MODEL_BACKBONE}_{'slice' if MODE_SLICE else 'argmax'}_{NUM_AUG}{'_validation' if USE_VALIDATION else ''}")
+    AUGMENTED_COPIES_ROOT, f"{MODEL_BACKBONE}_{MODE}_{NUM_AUG}{'_validation' if USE_VALIDATION else ''}")
 STANDARD_OUTPUT_ROOT = os.path.join(SUPERRES_ROOT, "standard_output")
 STANDARD_OUTPUT_DIR = os.path.join(
     STANDARD_OUTPUT_ROOT, f"{MODEL_BACKBONE}{'_validation' if USE_VALIDATION else ''}")
@@ -48,26 +48,26 @@ OUTPUT_FOLDER = os.path.join(DATA_DIR, "threshold_test")
 def main():
     hyperparamters_default = {
         "lambda_df": 1.0,
-        "lambda_tv": 0.79,
-        "lambda_L2": 0.085,
-        "lambda_L1": 0.0022,
+        "lambda_tv": 0.84,
+        "lambda_L2": 0.047,
+        "lambda_L1": 0.0065,
         "num_iter": 300,
         "num_aug": NUM_AUG,
         "num_samples": NUM_SAMPLES,
         "copy_dropout": 0.2,
         "use_BTV": False,
         "optimizer": "adam",
-        "learning_rate": 1e-3,
+        "learning_rate": 1e-1,
         "beta_1": 0.9,
         "beta_2": 0.999,
         "epsilon": 1e-7,
-        "amsgrad": True,
+        "amsgrad": False,
         "initial_accumulator_value": 0.1,
         "nesterov": True,
         "momentum": 0.2,
         "lr_scheduler": True,
-        "decay_steps": 50,
-        "decay_rate": 0.5,
+        "decay_steps": 100,
+        "decay_rate": 0.65,
     }
 
     wandb_dir = os.path.join(DATA_DIR, "wandb_logs")
@@ -88,6 +88,7 @@ def main():
     }
 
     coeff_dict = normalize_coefficients(coeff_dict)
+    print(coeff_dict)
 
     optimizer_obj = Optimizer(optimizer=config.optimizer, learning_rate=config.learning_rate, epsilon=config.epsilon, beta_1=config.beta_1, beta_2=config.beta_2,
                               amsgrad=config.amsgrad, initial_accumulator_value=config.initial_accumulator_value, momentum=config.momentum, nesterov=config.nesterov,
@@ -100,85 +101,64 @@ def main():
     precomputed_data_paths = path_list if config.num_samples is None else path_list[
         :config.num_samples]
 
-    filenames = []
-
-    image_array = tf.TensorArray(
-        tf.float32, size=0, dynamic_size=True, clear_after_read=False)
-    ground_truth = tf.TensorArray(
-        tf.float32, size=0, dynamic_size=True, clear_after_read=False)
+    th_values = [round(v, 2) for v in np.arange(0.1, 0.95, step=0.05)]
+    ious_th = np.empty((len(th_values), NUM_SAMPLES))
+    standard_ious = []
 
     for i, filepath in tqdm(enumerate(precomputed_data_paths)):
 
         try:
             class_masks, _, angles, shifts, filename = load_SR_data(
-                filepath, num_aug=NUM_AUG, mode_slice=MODE_SLICE, global_normalize=True)
+                filepath, num_aug=NUM_AUG, global_normalize=True)
         except Exception:
             print(f"File: {filepath} is invalid, skipping...")
             continue
 
-        filenames.append(filename)
-
-        true_mask_path = os.path.join(
+        ground_truth_path = os.path.join(
             PASCAL_ROOT, "SegmentationClassAug", f"{filename}.png")
-        true_mask = load_image(true_mask_path, image_size=IMG_SIZE, normalize=False,
-                               is_png=True, resize_method="nearest")
+        ground_truth = load_image(ground_truth_path, image_size=IMG_SIZE, normalize=False,
+                                  is_png=True, resize_method="nearest")
+
+        standard_mask_path = os.path.join(
+            STANDARD_OUTPUT_DIR, f"{filename}.png")
+        standard_mask = load_image(standard_mask_path, image_size=IMG_SIZE, normalize=False, is_png=True,
+                                   resize_method="nearest")
+
+        standard_ious.append(compute_IoU(
+            ground_truth, standard_mask, img_size=IMG_SIZE, class_id=CLASS_ID))
 
         target_augmented_SR, _ = superresolution_obj.augmented_superresolution(
             class_masks, angles, shifts)
 
-        image_array = image_array.write(i, target_augmented_SR)
-        ground_truth = ground_truth.write(i, true_mask)
+        # tf.keras.utils.save_img(
+        #     f"{OUTPUT_FOLDER}/{filename}.png", target_augmented_SR, scale=True)
 
-        # standard_mask_path = os.path.join(
-        #     STANDARD_OUTPUT_DIR, f"{filename}.png")
-        # standard_mask = load_image(standard_mask_path, image_size=IMG_SIZE, normalize=False, is_png=True,
-        #                            resize_method="nearest")
-
-        tf.keras.utils.save_img(
-            f"{OUTPUT_FOLDER}/{filename}.png", image_array.read(i), scale=True)
-
-    th_values = [round(v, 2) for v in np.arange(0.1, 0.95, step=0.05)]
-    data_list = []
-
-    for value in th_values:
-        ious = []
-        for z in range(image_array.size()):
-
+        for k, value in enumerate(th_values):
             th_mask = threshold_image(
-                image_array.read(z), CLASS_ID, th_factor=value)
+                target_augmented_SR, CLASS_ID, th_factor=value)
             augmented_SR_iou = compute_IoU(
-                ground_truth.read(z), th_mask, img_size=IMG_SIZE, class_id=CLASS_ID)
+                ground_truth, th_mask, img_size=IMG_SIZE, class_id=CLASS_ID)
 
-            ious.append(augmented_SR_iou)
+            ious_th[k, i] = augmented_SR_iou
             # tf.keras.utils.save_img(
-            #     f"{TEST_FOLDER}/{filenames[z]}_th_{value}.png", th_mask, scale=True)
+            #     f"{OUTPUT_FOLDER}/{filenames[z]}_th_{value}.png", th_mask, scale=True)
 
-        avg_iou = np.mean(ious)
+    data_list = []
+    for v in range(len(th_values)):
+
         data_list.append({
-            "Th Value": value,
-            "IoU": avg_iou
+            "Th_Value": th_values[v],
+            "IoU": np.mean(ious_th[v])
         })
-        print(f"Th Value: {value}, IoU: {avg_iou}")
 
     df = pd.DataFrame(data_list)
     print(df)
+    print(f"Best record: {df.iloc[df['IoU'].idxmax()]}")
+    print(f"Standard IoU: {np.mean(standard_ious)}")
+
+    df.to_csv(os.path.join(OUTPUT_FOLDER, f"th_{MODE}_{NUM_SAMPLES}.csv"))
+
     print("Done")
-    # standard_iou = compute_IoU(
-    #     true_mask, standard_mask, img_size=IMG_SIZE, class_id=CLASS_ID)
-
-    #     standard_ious.append(standard_iou)
-    #     augmented_SR_ious.append(augmented_SR_iou)
-
-    # avg_standard_iou = np.mean(standard_ious)
-    # avg_augmented_SR_iou = np.mean(augmented_SR_ious)
-
-    # print(
-    #     f"Avg. Standard IoUs: {avg_standard_iou},  Avg. Augmented SR IoUs: {avg_augmented_SR_iou}")
-
-    # wandb.log({"mean_superres_iou": avg_augmented_SR_iou,
-    #            "mean_standard_iou": avg_standard_iou})
-
-    # wandb.finish()
 
 
 if __name__ == '__main__':

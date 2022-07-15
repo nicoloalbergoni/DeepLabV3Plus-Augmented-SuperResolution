@@ -14,18 +14,21 @@ np.random.seed(SEED)
 tf.random.set_seed(SEED)
 
 tf.config.run_functions_eagerly(True)
-# os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 IMG_SIZE = (512, 512)
 FEATURE_SIZE = (128, 128)
-NUM_AUG = 100
+NUM_AUG_FOLDER = 100
+NUM_AUG = 10
 CLASS_ID = 8
-NUM_SAMPLES = 50
+NUM_SAMPLES = 100
+TH_FACTOR = 0.2
 
-MODE_SLICE = False
+
+MODE = "argmax"
 MODEL_BACKBONE = "xception"
-USE_VALIDATION = False
-SAVE_SLICE_OUTPUT = False
+USE_VALIDATION = True
+SAVE_SLICE_OUTPUT = True
 
 DATA_DIR = os.path.join(os.getcwd(), "data")
 PASCAL_ROOT = os.path.join(DATA_DIR, "dataset_root", "VOCdevkit", "VOC2012")
@@ -34,7 +37,7 @@ IMGS_PATH = os.path.join(PASCAL_ROOT, "JPEGImages")
 SUPERRES_ROOT = os.path.join(DATA_DIR, "superres_root")
 AUGMENTED_COPIES_ROOT = os.path.join(SUPERRES_ROOT, "augmented_copies")
 PRECOMPUTED_OUTPUT_DIR = os.path.join(
-    AUGMENTED_COPIES_ROOT, f"{MODEL_BACKBONE}_{'slice' if MODE_SLICE else 'argmax'}_{NUM_AUG}{'_validation' if USE_VALIDATION else ''}")
+    AUGMENTED_COPIES_ROOT, f"{MODEL_BACKBONE}_{MODE}_{NUM_AUG_FOLDER}{'_validation' if USE_VALIDATION else ''}")
 STANDARD_OUTPUT_ROOT = os.path.join(SUPERRES_ROOT, "standard_output")
 STANDARD_OUTPUT_DIR = os.path.join(
     STANDARD_OUTPUT_ROOT, f"{MODEL_BACKBONE}{'_validation' if USE_VALIDATION else ''}")
@@ -45,26 +48,26 @@ SUPERRES_OUTPUT_DIR = os.path.join(
 def main():
     hyperparamters_default = {
         "lambda_df": 1.0,
-        "lambda_tv": 0.79,
-        "lambda_L2": 0.085,
-        "lambda_L1": 0.0022,
+        "lambda_tv": 0.82,
+        "lambda_L2": 0.93,
+        "lambda_L1": 0.44,
         "num_iter": 300,
         "num_aug": NUM_AUG,
         "num_samples": NUM_SAMPLES,
-        "copy_dropout": 0.2,
+        "copy_dropout": 0.0,
         "use_BTV": False,
         "optimizer": "adam",
         "learning_rate": 1e-3,
         "beta_1": 0.9,
         "beta_2": 0.999,
         "epsilon": 1e-7,
-        "amsgrad": True,
+        "amsgrad": False,
         "initial_accumulator_value": 0.1,
         "nesterov": True,
         "momentum": 0.2,
         "lr_scheduler": True,
-        "decay_steps": 50,
-        "decay_rate": 0.5,
+        "decay_steps": 60,
+        "decay_rate": 0.3,
     }
 
     wandb_dir = os.path.join(DATA_DIR, "wandb_logs")
@@ -85,6 +88,7 @@ def main():
     }
 
     coeff_dict = normalize_coefficients(coeff_dict)
+    print(coeff_dict)
 
     optimizer_obj = Optimizer(optimizer=config.optimizer, learning_rate=config.learning_rate, epsilon=config.epsilon, beta_1=config.beta_1, beta_2=config.beta_2,
                               amsgrad=config.amsgrad, initial_accumulator_value=config.initial_accumulator_value, momentum=config.momentum, nesterov=config.nesterov,
@@ -106,7 +110,7 @@ def main():
 
         try:
             class_masks, max_masks, angles, shifts, filename = load_SR_data(
-                filepath, num_aug=NUM_AUG, mode_slice=MODE_SLICE, global_normalize=True)
+                filepath, num_aug=NUM_AUG, global_normalize=True)
         except Exception:
             print(f"File: {filepath} is invalid, skipping...")
             continue
@@ -122,13 +126,13 @@ def main():
                                    resize_method="nearest")
 
         target_augmented_SR = compute_SR(superresolution_obj, class_masks, angles, shifts, filename, max_masks=max_masks, SR_type="aug",
-                                         save_output=SAVE_SLICE_OUTPUT, class_id=CLASS_ID, dest_folder=SUPERRES_OUTPUT_DIR)
+                                         save_output=SAVE_SLICE_OUTPUT, class_id=CLASS_ID, dest_folder=SUPERRES_OUTPUT_DIR, th_factor=TH_FACTOR)
 
         target_max_SR = compute_SR(superresolution_obj, class_masks, angles, shifts, filename, max_masks=max_masks, SR_type="max",
-                                   save_output=SAVE_SLICE_OUTPUT, class_id=CLASS_ID, dest_folder=SUPERRES_OUTPUT_DIR)
+                                   save_output=SAVE_SLICE_OUTPUT, class_id=CLASS_ID, dest_folder=SUPERRES_OUTPUT_DIR, th_factor=TH_FACTOR)
 
         target_mean_SR = compute_SR(superresolution_obj, class_masks, angles, shifts, filename, max_masks=max_masks, SR_type="mean",
-                                    save_output=SAVE_SLICE_OUTPUT, class_id=CLASS_ID, dest_folder=SUPERRES_OUTPUT_DIR)
+                                    save_output=SAVE_SLICE_OUTPUT, class_id=CLASS_ID, dest_folder=SUPERRES_OUTPUT_DIR, th_factor=TH_FACTOR)
 
         standard_iou = compute_IoU(
             true_mask, standard_mask, img_size=IMG_SIZE, class_id=CLASS_ID)

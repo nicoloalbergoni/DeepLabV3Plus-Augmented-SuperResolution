@@ -151,7 +151,7 @@ def normalize_coefficients(coeff_dict):
     return new_dict
 
 
-def load_SR_data(filepath, num_aug=100, mode_slice=True, global_normalize=True):
+def load_SR_data(filepath, num_aug=100, global_normalize=True):
     """
     Load and unpacks a hdf5 file that contains the data for the super-resolution problem
 
@@ -159,7 +159,6 @@ def load_SR_data(filepath, num_aug=100, mode_slice=True, global_normalize=True):
         filepath (str): the full path to the hdf5 file
         num_aug (int, optional): The (minimum) length of each image array in the file. 
             Used to check the file validity. Defaults to 100.
-        mode_slice (bool, optional): Toggle between slice mode and argmax mode. Defaults to True.
         global_normalize (bool, optional): Whether to normalize the images with respect to the global max/min from all image array. Defaults to True.
 
     Raises:
@@ -175,22 +174,27 @@ def load_SR_data(filepath, num_aug=100, mode_slice=True, global_normalize=True):
         raise Exception(f"File: {filepath} is invalid")
 
     filename = file.attrs["filename"]
+    mode = file.attrs["mode"]
     angles = file["angles"][:num_aug]
     shifts = file["shifts"][:num_aug]
 
     class_masks = file["class_masks"][:num_aug]
     class_masks = tf.stack(class_masks)
 
-    global_min, global_max = (tf.reduce_min(class_masks), tf.reduce_max(class_masks)) if global_normalize else (
-        None, None)
-
-    class_masks = tf.map_fn(
-        fn=lambda image: min_max_normalization(image.numpy(), new_min=0.0, new_max=1.0, global_min=global_min,
-                                               global_max=global_max), elems=class_masks)
-
     max_masks = None
 
-    if mode_slice:
+    if mode != "slice_var":
+        # For slice or argmax mode normalization is needed
+
+        global_min, global_max = (tf.reduce_min(class_masks), tf.reduce_max(class_masks)) if global_normalize else (
+            None, None)
+
+        class_masks = tf.map_fn(
+            fn=lambda image: min_max_normalization(image.numpy(), new_min=0.0, new_max=1.0, global_min=global_min,
+                                                   global_max=global_max), elems=class_masks)
+
+    if mode == "slice":
+        # max_class is only available for argmax mode
         max_masks = file["max_masks"][:num_aug]
         max_masks = tf.stack(max_masks)
 
@@ -207,7 +211,7 @@ def load_SR_data(filepath, num_aug=100, mode_slice=True, global_normalize=True):
 
 
 def compute_SR(superresolution_obj: Superresolution, class_masks, angles, shifts, filename, dest_folder,
-               SR_type="aug", max_masks=None, save_output=False, class_id=8):
+               SR_type="aug", max_masks=None, save_output=False, class_id=8, th_factor=0.15):
     """
     Computes the SR problem.
 
@@ -217,12 +221,12 @@ def compute_SR(superresolution_obj: Superresolution, class_masks, angles, shifts
         angles (ndarray): The arry of angles used in the augmentaion process
         shifts (ndarray): The arry of shifts used in the augmentaion process
         filename (str): The filename asscociated with the image
+        dest_folder (Path): Path to store the final target image.
         SR_type (str): One of 'aug', 'mean', 'max'. Defines the type of SR
         max_masks (Tensor, optional): Used in slice mode. It's the array of the max images. Defaults to None.
         save_output (bool, optional): Store the intermediate class/max HR images. Defaults to False.
         class_id (int, optional): class id of the selected class. Defaults to 8.
-        dest_folder (Path, optional): Path to store the final target image.
-
+        th_factor (float, optional): Percentage factor used for thresholding the final image. Defaults to .15
     Returns:
         ndarray: The final HR image
     """
@@ -250,7 +254,8 @@ def compute_SR(superresolution_obj: Superresolution, class_masks, angles, shifts
             target_image_class, class_id, th_mask=target_image_max)
 
     else:
-        th_mask = threshold_image(target_image_class, class_id, th_factor=.15)
+        th_mask = threshold_image(
+            target_image_class, class_id, th_factor=th_factor)
 
     if save_output:
         tf.keras.utils.save_img(

@@ -1,5 +1,5 @@
 entity: albergoni-nicolo
-project: Argmax 0.2 angle 5 shift (500 samples)
+project: Argmax 200 aug 300 samples
 program: sweep_script.py
 method: bayes
 metric:
@@ -27,16 +27,16 @@ parameters:
   lr_scheduler:
     value: True
   decay_rate:
-    value: 0.5
+    value: 0.3
   decay_steps:
-    value: 50
+    value: 60
   learning_rate:
     value: 1e-3     
   copy_dropout:
-    max: 0.4
     min: 0.0
-    distribution: q_uniform
+    max: 0.4
     q: 0.1
+    distribution: q_uniform
   use_BTV:
     value: False
   amsgrad:

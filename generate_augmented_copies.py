@@ -8,7 +8,7 @@ import tensorflow as tf
 from model import DeeplabV3Plus
 import tensorflow_addons as tfa
 from utils import load_image, get_prediction, create_mask
-from superresolution_scripts.superres_utils import get_img_paths, filter_images_by_class
+from superresolution_scripts.superres_utils import get_img_paths, filter_images_by_class, min_max_normalization
 
 # os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
@@ -19,7 +19,7 @@ parser.add_argument(
     "--num_samples", help="Number of samples taken from the dataset", action="store", type=int, default=500)
 
 parser.add_argument(
-    "--mode_slice", help="Whether to operate in slicing or argmax mode", action="store_true")
+    "--mode", help="Whether to operate in slicing, slicing variation or argmax mode", action="store", type=str, choices=["slice", "slice_var", "argmax"], default="slice")
 
 parser.add_argument("--angle_max", help="Max angle value (in radians) used for rotations", action="store",
                     type=float, default=0.3)
@@ -29,6 +29,12 @@ parser.add_argument("--shift_max", help="Max shift value used for traslations", 
 
 parser.add_argument("--backbone", help="Either mobilenet or xception, specifies the type of backbone to use", action="store",
                     type=str, choices=["mobilenet", "xception"], default="xception")
+
+parser.add_argument("--standard_output",
+                    help="Compute standard network output", action="store_true")
+
+parser.add_argument("--use_validation",
+                    help="Create data from validation set", action="store_true")
 
 args = parser.parse_args()
 
@@ -45,9 +51,10 @@ CLASS_ID = 8
 NUM_SAMPLES = args.num_samples
 ANGLE_MAX = args.angle_max
 SHIFT_MAX = args.shift_max
-MODE_SLICE = args.mode_slice
+MODE = args.mode
 MODEL_BACKBONE = args.backbone
-USE_VALIDATION = False
+COMPUTE_STANDARD_OUTPUT = args.standard_output
+USE_VALIDATION = args.use_validation
 
 DATA_DIR = os.path.join(os.getcwd(), "data")
 PASCAL_ROOT = os.path.join(DATA_DIR, "dataset_root", "VOCdevkit", "VOC2012")
@@ -56,7 +63,7 @@ IMGS_PATH = os.path.join(PASCAL_ROOT, "JPEGImages")
 SUPERRES_ROOT = os.path.join(DATA_DIR, "superres_root")
 AUGMENTED_COPIES_ROOT = os.path.join(SUPERRES_ROOT, "augmented_copies")
 AUGMENTED_COPIES_OUTPUT_DIR = os.path.join(AUGMENTED_COPIES_ROOT,
-                                           f"{MODEL_BACKBONE}_{'slice' if MODE_SLICE else 'argmax'}_{NUM_AUG}{'_validation' if USE_VALIDATION else ''}")
+                                           f"{MODEL_BACKBONE}_{MODE}_{NUM_AUG}{'_validation' if USE_VALIDATION else ''}")
 STANDARD_OUTPUT_ROOT = os.path.join(SUPERRES_ROOT, "standard_output")
 STANDARD_OUTPUT_DIR = os.path.join(
     STANDARD_OUTPUT_ROOT, f"{MODEL_BACKBONE}{'_validation' if USE_VALIDATION else ''}")
@@ -132,8 +139,8 @@ def create_augmented_copies_chunked(image, num_aug, angle_max, shift_max, chunk_
     return augmented_copies, angles, shifts
 
 
-def compute_augmented_features(images_paths, model, dest_folder, filter_class_id, mode_slice=True, num_aug=100,
-                               angle_max=0.5, shift_max=30, save_output=False, relu_output=False, image_size=(512, 512)):
+def compute_augmented_features(images_paths, model, dest_folder, filter_class_id, mode="slice", num_aug=100,
+                               angle_max=0.5, shift_max=30, save_output=False, image_size=(512, 512)):
 
     for image_path in tqdm(images_paths):
         image_name = os.path.splitext(os.path.basename(image_path))[0]
@@ -158,7 +165,7 @@ def compute_augmented_features(images_paths, model, dest_folder, filter_class_id
 
         for i, prediction in enumerate(predictions):
 
-            if mode_slice:
+            if mode == "slice":
                 # Get the slice corresponding to the class id
                 class_mask = tf.gather(
                     prediction, filter_class_id, axis=-1)[..., tf.newaxis]
@@ -169,12 +176,18 @@ def compute_augmented_features(images_paths, model, dest_folder, filter_class_id
                 max_mask = tf.reduce_max(
                     tf.gather(prediction, gather_indexes, axis=-1), axis=-1)[..., tf.newaxis]
 
-                # ReLU is only needed when working with slices
-                if relu_output:
-                    class_mask = (tf.nn.relu(class_mask)).numpy()
-                    max_mask = (tf.nn.relu(max_mask)).numpy()
-
                 max_masks.append(max_mask)
+
+            elif mode == "slice_var":
+                # Get the slice corresponding to the class id
+                class_mask = tf.gather(
+                    prediction, filter_class_id, axis=-1)[..., tf.newaxis]
+
+                global_max = tf.reduce_max(prediction)
+                global_min = tf.reduce_min(prediction)
+
+                class_mask = min_max_normalization(class_mask.numpy(), new_min=0.0, new_max=1.0, global_min=global_min,
+                                                   global_max=global_max)
 
             else:
                 class_mask = create_mask(prediction)
@@ -187,23 +200,23 @@ def compute_augmented_features(images_paths, model, dest_folder, filter_class_id
 
             class_masks.append(class_mask)
 
-            if save_output:
+            if save_output and (i % 10) == 0:
                 tf.keras.utils.save_img(
                     f"{output_folder}/{i}_class.png", class_mask, scale=True)
-                if mode_slice:
+                if mode == "slice":
                     tf.keras.utils.save_img(
                         f"{output_folder}/{i}_max.png", max_mask, scale=True)
 
         file = h5py.File(f"{output_folder}/{image_name}.hdf5", "w")
         file.create_dataset("class_masks", data=class_masks)
 
-        if mode_slice:
+        if mode == "slice":
             file.create_dataset("max_masks", data=max_masks)
 
         file.create_dataset("angles", data=angles)
         file.create_dataset("shifts", data=shifts)
         file.attrs["filename"] = image_name
-        file.attrs["mode"] = "slice" if mode_slice else "argmax"
+        file.attrs["mode"] = mode
         file.attrs["angle_max"] = angle_max
         file.attrs["shift_max"] = shift_max
         file.attrs["backbone"] = MODEL_BACKBONE
@@ -222,19 +235,20 @@ def main():
     print(
         f"Valid images: {len(images_paths_filtered)} (Initial: {len(image_paths)})")
 
-    model = DeeplabV3Plus(
-        input_shape=(512, 512, 3),
-        classes=21,
-        OS=16,
-        last_activation=None,
-        load_weights=True,
-        backbone=MODEL_BACKBONE,
-        alpha=1.).build_model(final_upsample=True)
+    if COMPUTE_STANDARD_OUTPUT:
+        model = DeeplabV3Plus(
+            input_shape=(512, 512, 3),
+            classes=21,
+            OS=16,
+            last_activation=None,
+            load_weights=True,
+            backbone=MODEL_BACKBONE,
+            alpha=1.).build_model(final_upsample=True)
 
-    # Compute standard (classicl upsample) masks
-    print("Computing standard output images...")
-    compute_standard_output(images_paths_filtered, model, dest_folder=STANDARD_OUTPUT_DIR,
-                            filter_class_id=CLASS_ID, overwrite=False)
+        # Compute standard (classicl upsample) masks
+        print("Computing standard output images...")
+        compute_standard_output(images_paths_filtered, model, dest_folder=STANDARD_OUTPUT_DIR,
+                                filter_class_id=CLASS_ID, overwrite=False)
 
     model = DeeplabV3Plus(
         input_shape=(512, 512, 3),
@@ -246,10 +260,10 @@ def main():
         alpha=1.).build_model(final_upsample=False)
 
     print("Generating augmented copies...")
-    compute_augmented_features(images_paths_filtered, model, mode_slice=MODE_SLICE,
+    compute_augmented_features(images_paths_filtered, model, mode=MODE,
                                dest_folder=AUGMENTED_COPIES_OUTPUT_DIR, filter_class_id=CLASS_ID,
                                num_aug=NUM_AUG, angle_max=ANGLE_MAX, shift_max=SHIFT_MAX,
-                               save_output=True, relu_output=False, image_size=IMG_SIZE)
+                               save_output=True, image_size=IMG_SIZE)
 
 
 if __name__ == '__main__':
