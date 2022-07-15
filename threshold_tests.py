@@ -21,7 +21,7 @@ IMG_SIZE = (512, 512)
 FEATURE_SIZE = (128, 128)
 NUM_AUG = 100
 CLASS_ID = 8
-NUM_SAMPLES = 300
+NUM_SAMPLES = 500
 
 MODE = "slice_var"
 MODEL_BACKBONE = "xception"
@@ -57,7 +57,7 @@ def main():
         "copy_dropout": 0.2,
         "use_BTV": False,
         "optimizer": "adam",
-        "learning_rate": 1e-2,
+        "learning_rate": 1e-1,
         "beta_1": 0.9,
         "beta_2": 0.999,
         "epsilon": 1e-7,
@@ -130,8 +130,8 @@ def main():
         target_augmented_SR, _ = superresolution_obj.augmented_superresolution(
             class_masks, angles, shifts)
 
-        tf.keras.utils.save_img(
-            f"{OUTPUT_FOLDER}/{filename}.png", target_augmented_SR, scale=True)
+        # tf.keras.utils.save_img(
+        #     f"{OUTPUT_FOLDER}/{filename}.png", target_augmented_SR, scale=True)
 
         for k, value in enumerate(th_values):
             th_mask = threshold_image(
@@ -147,7 +147,7 @@ def main():
     for v in range(len(th_values)):
 
         data_list.append({
-            "Th Value": th_values[v],
+            "Th_Value": th_values[v],
             "IoU": np.mean(ious_th[v])
         })
 
@@ -155,6 +155,9 @@ def main():
     print(df)
     print(f"Best record: {df.iloc[df['IoU'].idxmax()]}")
     print(f"Standard IoU: {np.mean(standard_ious)}")
+
+    df.to_csv(os.path.join(OUTPUT_FOLDER, f"th_{MODE}_{NUM_SAMPLES}.csv"))
+
     print("Done")
 
 

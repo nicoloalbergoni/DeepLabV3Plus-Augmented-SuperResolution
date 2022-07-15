@@ -43,7 +43,7 @@
         "--angle_max",
         "0.15",
         "--shift_max",
-        "20",
+        "80",
         "--backbone",
         "xception",
         "--standard_output",
