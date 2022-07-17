@@ -98,42 +98,40 @@ def main():
         reshape_outputs=False,
         alpha=1.).build_model()
 
-    # angle_values = [round(angle, 2) for angle in np.linspace(0.0, 3.14, num=9)]
+    angle_values = [round(angle, 2)
+                    for angle in np.linspace(0.0, 3.14, num=10)]
+    shift_x_values = np.linspace(-80, 80, num=17, dtype=int)
+    shift_y_values = np.linspace(-80, 80, num=17, dtype=int)
+
+    # angle_values = [round(angle, 2)
+    #                 for angle in np.arange(-1.0, 1.05, step=0.05)]
     # shift_x_values = np.linspace(0, 80, num=9, dtype=int)
     # shift_y_values = np.linspace(0, 80, num=9, dtype=int)
-
-    angle_values = [round(angle, 2)
-                    for angle in np.arange(-1.0, 1.05, step=0.05)]
-    shift_x_values = np.linspace(0, 80, num=9, dtype=int)
-    shift_y_values = np.linspace(0, 80, num=9, dtype=int)
 
     all_combinations = list(itertools.product(
         angle_values, shift_x_values, shift_y_values))
 
-    csv_header = ["Angle", "Shift_X", "Shift_Y", "IoU"]
-    csv_path = f"{DEST_FOLDER}/robustness_small_{NUM_SAMPLES}.csv"
+    csv_header = ["Angle", "Shift_X", "Shift_Y", "mIoU"]
+    csv_path = f"{DEST_FOLDER}/robustness_{NUM_SAMPLES}.csv"
     f = open(csv_path, "w")
     writer = csv.writer(f, delimiter=',', quotechar='"', quoting=csv.QUOTE_ALL)
     writer.writerow(csv_header)
 
     for i, (angle, shift_x, shift_y) in tqdm(enumerate(all_combinations)):
 
-        # wandb.init(project="Robustness check (350 samples, N=9)",
-        #            entity="albergoni-nicolo")
-
         aug_images = augment_images(images, angle, shift_x, shift_y)
-        aug_gt = augment_images(
-            gt_images, angle, shift_x, shift_y, interpolation="nearest")
+        aug_gt = augment_images(gt_images, angle, shift_x,
+                                shift_y, interpolation="nearest")
 
         predictions = model.predict(aug_images, batch_size=BATCH_SIZE)
         _ = gc.collect()
 
         ious = []
-
         for k, pred in enumerate(predictions):
-            image_name = os.path.splitext(os.path.basename(image_paths[k]))[0]
-            save_path = os.path.join(IMAGE_OUTPUT_FOLDER, f"{image_name}.png")
-            iou = round(compute_IoU(aug_gt[k], pred), 3)
+            # image_name = os.path.splitext(os.path.basename(image_paths[k]))[0]
+            # save_path = os.path.join(IMAGE_OUTPUT_FOLDER, f"{image_name}.png")
+            pred_mask = create_mask(pred)
+            iou = round(compute_IoU(aug_gt[k], pred_mask), 3)
 
             # plot_title = f"mIoU: {iou}, Angle: {angle}, Shift X: {shift_x}, Shift Y: {shift_y}"
             # save_plot(aug_images[k], create_mask(
@@ -144,17 +142,9 @@ def main():
         avg_mean_iou = round(np.mean(ious), 3)
 
         print(
-            f"Angle: {angle}, Shift X: {shift_x}, Shift Y: {shift_y}, IoU: {avg_mean_iou}")
+            f"Angle: {angle}, Shift X: {shift_x}, Shift Y: {shift_y}, mIoU: {avg_mean_iou}")
         writer.writerow([angle, shift_x, shift_y, avg_mean_iou])
         f.flush()
-        # wandb.log({
-        #     "Angle": angle,
-        #     "Shift_X": shift_x,
-        #     "Shift_Y": shift_y,
-        #     "IoU": avg_mean_iou
-        # })
-
-        # wandb.finish(quiet=True)
 
     f.close()
     print("Done")

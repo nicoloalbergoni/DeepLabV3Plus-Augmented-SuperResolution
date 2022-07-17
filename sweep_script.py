@@ -123,16 +123,16 @@ def main():
                                     save_output=SAVE_SLICE_OUTPUT, class_id=CLASS_ID, dest_folder=SUPERRES_OUTPUT_DIR, th_factor=TH_FACTOR)
 
         standard_iou = compute_IoU(
-            true_mask, standard_mask, img_size=IMG_SIZE, class_id=CLASS_ID)
+            true_mask, standard_mask, img_size=IMG_SIZE, class_list=[CLASS_ID])
 
         augmented_SR_iou = compute_IoU(
-            true_mask, target_augmented_SR, img_size=IMG_SIZE, class_id=CLASS_ID)
+            true_mask, target_augmented_SR, img_size=IMG_SIZE, class_list=[CLASS_ID])
 
         max_SR_iou = compute_IoU(
-            true_mask, target_max_SR, img_size=IMG_SIZE, class_id=CLASS_ID)
+            true_mask, target_max_SR, img_size=IMG_SIZE, class_list=[CLASS_ID])
 
         mean_SR_iou = compute_IoU(
-            true_mask, target_mean_SR, img_size=IMG_SIZE, class_id=CLASS_ID)
+            true_mask, target_mean_SR, img_size=IMG_SIZE, class_list=[CLASS_ID])
 
         standard_ious.append(standard_iou)
         augmented_SR_ious.append(augmented_SR_iou)
