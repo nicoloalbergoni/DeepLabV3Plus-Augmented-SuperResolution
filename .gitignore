@@ -295,3 +295,4 @@ wandb/
 prediction_output
 !data/robustness_check/robustness_350.csv
 !data/robustness_check/robustness_small_350.csv
+test_folder/*
