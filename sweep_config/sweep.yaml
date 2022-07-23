@@ -1,5 +1,5 @@
 entity: albergoni-nicolo
-project: Argmax 200 aug 300 samples
+project: Argmax - new range no L1
 program: sweep_script.py
 method: bayes
 metric:
@@ -9,17 +9,17 @@ parameters:
   lambda_df:
     value: 1.0
   lambda_tv:
-    max: 1
-    min: 0.0
-    distribution: uniform
+    max: 6
+    min: 2
+    distribution: q_uniform
+    q: 0.5
   lambda_L2:
-    max: 1
-    min: 0.0
-    distribution: uniform
+    max: 15
+    min: 6.5
+    distribution: q_uniform
+    q: 0.5
   lambda_L1:
-    max: 1
-    min: 0.0
-    distribution: uniform
+    value: 0.0
   num_iter:
     value: 300
   optimizer:
@@ -33,16 +33,11 @@ parameters:
   learning_rate:
     value: 1e-3     
   copy_dropout:
-    min: 0.0
-    max: 0.4
-    q: 0.1
-    distribution: q_uniform
+    value: 0.0
   use_BTV:
     value: False
   amsgrad:
-    values:
-      - True
-      - False   
+    value: True   
 #command:
 #- ${env}
 #- C:\Users\alber\Desktop\DeepLabV3Plus-Augmented-SuperResolution\venv\Scripts\python.exe

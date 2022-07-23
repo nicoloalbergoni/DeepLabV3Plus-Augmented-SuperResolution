@@ -53,7 +53,7 @@ def main():
         "num_aug": NUM_AUG,
         "num_samples": NUM_SAMPLES,
         "use_BTV": True,
-        "copy_dropout": 0.5,
+        "copy_dropout": 0.0,
         "optimizer": "adam",
         "learning_rate": 1e-3,
         "beta_1": 0.9,
