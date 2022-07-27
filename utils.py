@@ -59,35 +59,6 @@ def sparse_accuracy_ignoring_last_label(y_true, y_pred):
     return right_labels / total_labels
 
 
-def Mean_IOU(y_true, y_pred):
-    """
-    Compute the Mean Intersection over Union between the predited mask and the ground truth
-
-    Args:
-        y_true (Tensor): Ground truth image flattened (H * W, 1)
-        y_pred (Tensor): Predicted tensor flattened (H * W, NUM_CLASSES)
-
-    Returns:
-        Tensor: Float, mean IoU 
-    """
-    y_true_squeeze = tf.cast(tf.squeeze(y_true), tf.int32)
-    y_pred_squeeze = tf.squeeze(y_pred)
-    pred_pixels = tf.cast(tf.argmax(y_pred_squeeze, axis=-1), tf.int32)
-
-    # Get all the classes contained in the ground truth and remove the void class (id: 255)
-    labels, _ = tf.unique(y_true_squeeze)
-    labels = tf.gather(labels, tf.where(labels != 255))
-    ious = []
-    for i in labels:
-        true_labels = tf.equal(y_true_squeeze, i)
-        pred_labels = tf.equal(pred_pixels, i)
-        inter = tf.cast(true_labels & pred_labels, tf.int32)
-        union = tf.cast(true_labels | pred_labels, tf.int32)
-        iou = tf.reduce_sum(inter) / tf.reduce_sum(union)
-        ious.append(iou)
-    return tf.reduce_mean(ious)
-
-
 def sparse_Mean_IOU(y_true, y_pred):
     # Mean IoU computed between the ground truth and the predicted tensor each flattened and batched
 
@@ -118,29 +89,6 @@ def sparse_Mean_IOU(y_true, y_pred):
     legal_labels = ~tf.math.is_nan(iou)
     iou = tf.gather(iou, indices=tf.where(legal_labels))
     return tf.reduce_mean(iou)
-
-
-def single_class_IOU(y_true, y_pred, class_id):
-    y_true_squeeze = tf.squeeze(y_true)
-    y_pred_squeeze = tf.squeeze(y_pred)
-    classes = [0, class_id]  # Only check in background and given class
-
-    y_true_squeeze = tf.where(y_true_squeeze != class_id, 0, y_true_squeeze)
-
-    ious = []
-    for i in classes:
-        true_labels = tf.equal(y_true_squeeze, i)
-        pred_labels = tf.equal(y_pred_squeeze, i)
-        inter = tf.cast(true_labels & pred_labels, tf.int32)
-        union = tf.cast(true_labels | pred_labels, tf.int32)
-
-        iou = tf.reduce_sum(inter) / tf.reduce_sum(union)
-        ious.append(iou)
-
-    ious = tf.stack(ious)
-    legal_labels = ~tf.math.is_nan(ious)
-    ious = tf.gather(ious, indices=tf.where(legal_labels))
-    return tf.reduce_mean(ious)
 
 
 def load_image(img_path, image_size=None, normalize=True, is_png=False, resize_method="bilinear"):
@@ -200,7 +148,63 @@ def print_labels(masks):
         print(title[i] + str(dict(zip(values, count))))
 
 
-def compute_IoU(true_image, image, img_size=(512, 512), class_id=None, num_classes=21):
+def Mean_IOU(y_true, y_pred):
+    """
+    Compute the Mean Intersection over Union between the predited mask and the ground truth (after argmax)
+
+    Args:
+        y_true (Tensor): Ground truth image flattened (H * W, 1)
+        y_pred (Tensor): Predicted tensor flattened (H * W, 1)
+
+    Returns:
+        Tensor: Float, mean IoU 
+    """
+    y_true_squeeze = tf.cast(tf.squeeze(y_true), tf.int32)
+    y_pred_squeeze = tf.cast(tf.squeeze(y_pred), tf.int32)
+    # pred_pixels = tf.cast(tf.argmax(y_pred_squeeze, axis=-1), tf.int32)
+
+    # Get all the classes contained in the ground truth and remove the void class (id: 255)
+    labels, _ = tf.unique(y_true_squeeze)
+    labels = tf.gather(labels, tf.where(labels != 255))
+    ious = []
+    for i in labels:
+        true_labels = tf.equal(y_true_squeeze, i)
+        pred_labels = tf.equal(y_pred_squeeze, i)
+        inter = tf.cast(true_labels & pred_labels, tf.int32)
+        union = tf.cast(true_labels | pred_labels, tf.int32)
+        iou = tf.reduce_sum(inter) / tf.reduce_sum(union)
+        ious.append(iou)
+    return tf.reduce_mean(ious)
+
+
+def single_class_IOU(y_true, y_pred, class_id, include_bg):
+    y_true_squeeze = tf.squeeze(y_true)
+    y_pred_squeeze = tf.squeeze(y_pred)
+    classes = [class_id]
+
+    if include_bg:
+        classes.append(0)  # Include background class
+        # Set as background other classes
+        y_true_squeeze = tf.where(
+            y_true_squeeze != class_id, 0, y_true_squeeze)
+
+    ious = []
+    for i in classes:
+        true_labels = tf.equal(y_true_squeeze, i)
+        pred_labels = tf.equal(y_pred_squeeze, i)
+        inter = tf.cast(true_labels & pred_labels, tf.int32)
+        union = tf.cast(true_labels | pred_labels, tf.int32)
+
+        iou = tf.reduce_sum(inter) / tf.reduce_sum(union)
+        ious.append(iou)
+
+    ious = tf.stack(ious)
+    legal_labels = ~tf.math.is_nan(ious)
+    ious = tf.gather(ious, indices=tf.where(legal_labels))
+    return tf.reduce_mean(ious)
+
+
+def compute_IoU(true_image, image, img_size=(512, 512), class_id=None, include_bg=False):
     """
     Compute the IoU between the true image and the given imge.
     Can be used in single class mode by passing the class_id paramenter or in multiclass mode
@@ -208,20 +212,18 @@ def compute_IoU(true_image, image, img_size=(512, 512), class_id=None, num_class
 
     Args:
         true_image (Tensor): Ground Truth image HR
-        image (Tensor): Given image
+        image (Tensor): Predicted mask (after argmax)
         img_size (tuple, optional): HR image size. Defaults to (512, 512).
-        class_id (int, optional): id of the choosen class for single-class IoU. Defaults to None.
-        num_classes (int, optional): total number of classes. Default to 21 (PASCAL VOC total classses)
+        class_list (int, optional): List of classes id for single-class IoU. Defaults to None.
 
     Returns:
         float, float: The IoUs of the standard and superresolution images
     """
     true_image = tf.reshape(true_image, (img_size[0] * img_size[1], 1))
-    image = tf.reshape(
-        image, (img_size[0] * img_size[1], (1 if class_id is not None else num_classes)))
+    image = tf.reshape(image, (img_size[0] * img_size[1], 1))
 
     if class_id is not None:
-        iou = single_class_IOU(true_image, image, class_id=class_id)
+        iou = single_class_IOU(true_image, image, class_id, include_bg)
     else:
         iou = Mean_IOU(true_image, image)
 

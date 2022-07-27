@@ -4,7 +4,7 @@ program: sweep_script.py
 method: bayes
 metric:
   goal: maximize
-  name: avg_aug_SR_iou
+  name: aug_iou_single
 parameters:
   lambda_df:
     value: 1.0

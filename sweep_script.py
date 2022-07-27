@@ -52,8 +52,8 @@ def main():
         "num_iter": 300,
         "num_aug": NUM_AUG,
         "num_samples": NUM_SAMPLES,
-        "use_BTV": True,
-        "copy_dropout": 0.5,
+        "use_BTV": False,
+        "copy_dropout": 0.0,
         "optimizer": "adam",
         "learning_rate": 1e-3,
         "beta_1": 0.9,
@@ -78,7 +78,7 @@ def main():
         "lambda_L1": config.lambda_L1,
     }
 
-    coeff_dict = normalize_coefficients(coeff_dict)
+    # coeff_dict = normalize_coefficients(coeff_dict)
 
     optimizer_obj = Optimizer(optimizer=config.optimizer, learning_rate=config.learning_rate, epsilon=config.epsilon, beta_1=config.beta_1, beta_2=config.beta_2,
                               amsgrad=config.amsgrad, initial_accumulator_value=config.initial_accumulator_value, momentum=config.momentum, nesterov=config.nesterov,
@@ -91,8 +91,10 @@ def main():
     precomputed_data_paths = path_list if config.num_samples is None else path_list[
         :config.num_samples]
 
-    standard_ious = []
-    augmented_SR_ious = []
+    standard_ious_single = []
+    standard_ious_multiple = []
+    aug_SR_ious_single = []
+    aug_SR_ious_multiple = []
     max_SR_ious = []
     mean_SR_ious = []
 
@@ -122,38 +124,47 @@ def main():
         target_mean_SR = compute_SR(superresolution_obj, class_masks, angles, shifts, filename, max_masks=max_masks, SR_type="mean",
                                     save_output=SAVE_SLICE_OUTPUT, class_id=CLASS_ID, dest_folder=SUPERRES_OUTPUT_DIR, th_factor=TH_FACTOR)
 
-        standard_iou = compute_IoU(
+        standard_iou_single = compute_IoU(
             true_mask, standard_mask, img_size=IMG_SIZE, class_id=CLASS_ID)
-
-        augmented_SR_iou = compute_IoU(
+        standard_iou_multiple = compute_IoU(
+            true_mask, standard_mask, img_size=IMG_SIZE, class_id=CLASS_ID, include_bg=True)
+        aug_SR_iou_single = compute_IoU(
             true_mask, target_augmented_SR, img_size=IMG_SIZE, class_id=CLASS_ID)
-
+        aug_SR_iou_multiple = compute_IoU(
+            true_mask, target_augmented_SR, img_size=IMG_SIZE, class_id=CLASS_ID, include_bg=True)
         max_SR_iou = compute_IoU(
             true_mask, target_max_SR, img_size=IMG_SIZE, class_id=CLASS_ID)
-
         mean_SR_iou = compute_IoU(
             true_mask, target_mean_SR, img_size=IMG_SIZE, class_id=CLASS_ID)
 
-        standard_ious.append(standard_iou)
-        augmented_SR_ious.append(augmented_SR_iou)
+        standard_ious_single.append(standard_iou_single)
+        standard_ious_multiple.append(standard_iou_multiple)
+        aug_SR_ious_single.append(aug_SR_iou_single)
+        aug_SR_ious_multiple.append(aug_SR_iou_multiple)
         max_SR_ious.append(max_SR_iou)
         mean_SR_ious.append(mean_SR_iou)
 
-    avg_standard_iou = np.mean(standard_ious)
-    avg_augmented_SR_iou = np.mean(augmented_SR_ious)
+    avg_standard_iou_single = np.mean(standard_ious_single)
+    avg_standard_iou_multiple = np.mean(standard_ious_multiple)
+    avg_aug_SR_iou_single = np.mean(aug_SR_ious_single)
+    avg_aug_SR_iou_multiple = np.mean(aug_SR_ious_multiple)
     avg_max_SR_iou = np.mean(max_SR_ious)
     avg_mean_SR_iou = np.mean(mean_SR_ious)
 
-    print(
-        f"Avg. Standard IoUs: {avg_standard_iou},  Avg. Augmented SR IoUs: {avg_augmented_SR_iou}")
+    # print(
+    #     f"Avg. Standard IoUs: {avg_standard_iou},  Avg. Augmented SR IoUs: {avg_augmented_SR_iou}")
 
-    print(
-        f"Avg. Max SR IoUs: {avg_max_SR_iou}, Avg. Mean SR IoUs: {avg_mean_SR_iou}")
+    # print(
+    #     f"Avg. Max SR IoUs: {avg_max_SR_iou}, Avg. Mean SR IoUs: {avg_mean_SR_iou}")
 
-    wandb.log({"avg_aug_SR_iou": avg_augmented_SR_iou,
-               "avg_standard_iou": avg_standard_iou,
-               "avg_max_SR_iou": avg_max_SR_iou,
-               "avg_mean_SR_iou": avg_mean_SR_iou})
+    wandb.log({
+        "aug_iou_single": avg_aug_SR_iou_single,
+        "aug_iou_multiple": avg_aug_SR_iou_multiple,
+        "standard_iou_single": avg_standard_iou_single,
+        "standard_iou_multiple": avg_standard_iou_multiple,
+        "mean_iou": avg_mean_SR_iou,
+        "max_iou": avg_max_SR_iou
+    })
 
 
 if __name__ == '__main__':
