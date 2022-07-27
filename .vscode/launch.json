@@ -5,6 +5,26 @@
   "version": "0.2.0",
   "configurations": [
     {
+      "name": "Generate Standard Output",
+      "type": "python",
+      "request": "launch",
+      "program": "${workspaceFolder}/generate_standard_output.py",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "env": {
+        "CUDA_VISIBLE_DEVICES": "0"
+      },
+      "args": [
+        "--num_samples",
+        "500",
+        "--class_id",
+        "8",
+        "--backbone",
+        "xception",
+        // "--use_validation"
+      ]
+    },
+    {
       "name": "GPU Test",
       "type": "python",
       "request": "launch",

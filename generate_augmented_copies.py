@@ -7,7 +7,7 @@ from tqdm import tqdm
 import tensorflow as tf
 from model import DeeplabV3Plus
 import tensorflow_addons as tfa
-from utils import load_image, get_prediction, create_mask
+from utils import load_image, create_mask
 from superresolution_scripts.superres_utils import get_img_paths, filter_images_by_class, min_max_normalization
 
 # os.environ["CUDA_VISIBLE_DEVICES"] = "0"
@@ -30,9 +30,6 @@ parser.add_argument("--shift_max", help="Max shift value used for traslations", 
 parser.add_argument("--backbone", help="Either mobilenet or xception, specifies the type of backbone to use", action="store",
                     type=str, choices=["mobilenet", "xception"], default="xception")
 
-parser.add_argument("--standard_output",
-                    help="Compute standard network output", action="store_true")
-
 parser.add_argument("--use_validation",
                     help="Create data from validation set", action="store_true")
 
@@ -53,7 +50,6 @@ ANGLE_MAX = args.angle_max
 SHIFT_MAX = args.shift_max
 MODE = args.mode
 MODEL_BACKBONE = args.backbone
-COMPUTE_STANDARD_OUTPUT = args.standard_output
 USE_VALIDATION = args.use_validation
 
 DATA_DIR = os.path.join(os.getcwd(), "data")
@@ -67,25 +63,6 @@ AUGMENTED_COPIES_OUTPUT_DIR = os.path.join(AUGMENTED_COPIES_ROOT,
 STANDARD_OUTPUT_ROOT = os.path.join(SUPERRES_ROOT, "standard_output")
 STANDARD_OUTPUT_DIR = os.path.join(
     STANDARD_OUTPUT_ROOT, f"{MODEL_BACKBONE}{'_validation' if USE_VALIDATION else ''}")
-
-
-def compute_standard_output(images_paths, model, dest_folder, filter_class_id=None, image_size=(512, 512), overwrite=False):
-    if not os.path.exists(dest_folder):
-        os.makedirs(dest_folder)
-
-    for image_path in tqdm(images_paths):
-        image_name = os.path.splitext(os.path.basename(image_path))[0]
-        save_path = os.path.join(dest_folder, f"{image_name}.png")
-
-        if not overwrite and os.path.exists(save_path):
-            continue
-
-        image = load_image(image_path, image_size=image_size, normalize=True)
-        standard_mask = get_prediction(model, image)
-        if filter_class_id is not None:
-            standard_mask = tf.where(standard_mask == filter_class_id, standard_mask,
-                                     0)  # Set to 0 all predictions different from the given class
-        tf.keras.utils.save_img(save_path, standard_mask, scale=False)
 
 
 def create_augmented_copies(image, num_aug, angle_max, shift_max):
@@ -234,21 +211,6 @@ def main():
 
     print(
         f"Valid images: {len(images_paths_filtered)} (Initial: {len(image_paths)})")
-
-    if COMPUTE_STANDARD_OUTPUT:
-        model = DeeplabV3Plus(
-            input_shape=(512, 512, 3),
-            classes=21,
-            OS=16,
-            last_activation=None,
-            load_weights=True,
-            backbone=MODEL_BACKBONE,
-            alpha=1.).build_model(final_upsample=True)
-
-        # Compute standard (classicl upsample) masks
-        print("Computing standard output images...")
-        compute_standard_output(images_paths_filtered, model, dest_folder=STANDARD_OUTPUT_DIR,
-                                filter_class_id=CLASS_ID, overwrite=False)
 
     model = DeeplabV3Plus(
         input_shape=(512, 512, 3),
