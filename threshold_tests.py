@@ -125,7 +125,7 @@ def main():
                                    resize_method="nearest")
 
         standard_ious.append(compute_IoU(
-            ground_truth, standard_mask, img_size=IMG_SIZE, class_list=[CLASS_ID]))
+            ground_truth, standard_mask, img_size=IMG_SIZE, class_id=CLASS_ID))
 
         target_augmented_SR, _ = superresolution_obj.augmented_superresolution(
             class_masks, angles, shifts)
@@ -137,7 +137,7 @@ def main():
             th_mask = threshold_image(
                 target_augmented_SR, CLASS_ID, th_factor=value)
             augmented_SR_iou = compute_IoU(
-                ground_truth, th_mask, img_size=IMG_SIZE, class_list=[CLASS_ID])
+                ground_truth, th_mask, img_size=IMG_SIZE, class_id=CLASS_ID)
 
             ious_th[k, i] = augmented_SR_iou
             # tf.keras.utils.save_img(

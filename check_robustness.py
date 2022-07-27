@@ -140,7 +140,7 @@ def main():
 
             pred_mask = create_mask(pred)
             iou = round(compute_IoU(
-                aug_gt[k], pred_mask, class_list=None if not SINGLE_CLASS else [CLASS_ID]), 3)
+                aug_gt[k], pred_mask, class_id=None if not SINGLE_CLASS else CLASS_ID), 3)
 
             # plot_title = f"mIoU: {iou}, Angle: {angle}, Shift X: {shift_x}, Shift Y: {shift_y}"
             # save_plot(aug_images[k], pred_mask,

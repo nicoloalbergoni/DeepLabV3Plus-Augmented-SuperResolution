@@ -177,15 +177,19 @@ def Mean_IOU(y_true, y_pred):
     return tf.reduce_mean(ious)
 
 
-def single_class_IOU(y_true, y_pred, class_list):
+def single_class_IOU(y_true, y_pred, class_id, include_bg):
     y_true_squeeze = tf.squeeze(y_true)
     y_pred_squeeze = tf.squeeze(y_pred)
-    # classes = [0, class_id]  # Only check in background and given class
+    classes = [class_id]
 
-    # y_true_squeeze = tf.where(y_true_squeeze != class_id, 0, y_true_squeeze)
+    if include_bg:
+        classes.append(0)  # Include background class
+        # Set as background other classes
+        y_true_squeeze = tf.where(
+            y_true_squeeze != class_id, 0, y_true_squeeze)
 
     ious = []
-    for i in class_list:
+    for i in classes:
         true_labels = tf.equal(y_true_squeeze, i)
         pred_labels = tf.equal(y_pred_squeeze, i)
         inter = tf.cast(true_labels & pred_labels, tf.int32)
@@ -200,7 +204,7 @@ def single_class_IOU(y_true, y_pred, class_list):
     return tf.reduce_mean(ious)
 
 
-def compute_IoU(true_image, image, img_size=(512, 512), class_list=None):
+def compute_IoU(true_image, image, img_size=(512, 512), class_id=None, include_bg=False):
     """
     Compute the IoU between the true image and the given imge.
     Can be used in single class mode by passing the class_id paramenter or in multiclass mode
@@ -218,8 +222,8 @@ def compute_IoU(true_image, image, img_size=(512, 512), class_list=None):
     true_image = tf.reshape(true_image, (img_size[0] * img_size[1], 1))
     image = tf.reshape(image, (img_size[0] * img_size[1], 1))
 
-    if class_list is not None:
-        iou = single_class_IOU(true_image, image, class_list=class_list)
+    if class_id is not None:
+        iou = single_class_IOU(true_image, image, class_id, include_bg)
     else:
         iou = Mean_IOU(true_image, image)
 
