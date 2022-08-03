@@ -1,5 +1,5 @@
 entity: albergoni-nicolo
-project: Argmax - no normalization no L1
+project: Slice - no normalization L1
 program: sweep_script.py
 method: bayes
 metric:
@@ -9,17 +9,20 @@ parameters:
   lambda_df:
     value: 1.0
   lambda_tv:
-    max: 10
+    max: 5
     min: 0
     distribution: q_uniform
-    q: 0.5
+    q: 0.05
   lambda_L2:
-    max: 10
+    max: 5
     min: 0
     distribution: q_uniform
-    q: 0.5
+    q: 0.05
   lambda_L1:
-    value: 0
+    max: 5
+    min: 0
+    distribution: q_uniform
+    q: 0.05
   num_iter:
     value: 300
   optimizer:
