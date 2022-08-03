@@ -13,11 +13,11 @@ SEED = 1234
 np.random.seed(SEED)
 tf.random.set_seed(SEED)
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 IMG_SIZE = (512, 512)
 BATCH_SIZE = 16
-NUM_REPETITION = 150
+NUM_REPETITION = 100
 CLASS_ID = 8
 NUM_SAMPLES = 500
 MODEL_BACKBONE = "xception"
@@ -36,13 +36,22 @@ DROPOUT_ROOT = os.path.join(DATA_DIR, "dropout_root")
 DROPOUT_OUTPUT = os.path.join(DROPOUT_ROOT, "output")
 
 
-def modify_model(model, dropout_factor=.4):
+def get_layer_id(model, layer_name):
+    layers = model.layers
+    for i, layer in enumerate(layers):
+        if layer.name == layer_name:
+            return i
+
+    return None
+
+
+def modify_model(model, layer_id, dropout_factor=.4):
     layers = model.layers
     do = tf.keras.layers.Dropout(dropout_factor)(
-        layers[402].output, training=True)
+        layers[layer_id - 1].output, training=True)
 
     x = do
-    for i in range(403, len(layers)):
+    for i in range(layer_id, len(layers)):
         x = layers[i](x)
 
     result_model = tf.keras.Model(inputs=layers[0].input, outputs=x)
@@ -56,7 +65,7 @@ def dropout_sampling(image_paths, model, num_repetition, image_size=(512, 512), 
         os.makedirs(DROPOUT_OUTPUT)
 
     standard_ious_single = []
-    mask_ious_single = []
+    final_ious_single = []
     for image_path in tqdm(image_paths):
         image_name = os.path.splitext(os.path.basename(image_path))[0]
 
@@ -65,17 +74,24 @@ def dropout_sampling(image_paths, model, num_repetition, image_size=(512, 512), 
         image_batch = tf.repeat(tf.expand_dims(
             image, axis=0), num_repetition, axis=0)
 
+        # Output Size: 100 x 128 x 128 x 21
         predictions = model.predict(image_batch, batch_size=BATCH_SIZE)
         _ = gc.collect()
 
-        predicted_masks = tf.map_fn(
-            fn=lambda x: create_mask(x), elems=predictions, fn_output_signature=tf.int64)
+        # Output Size: 128 x 128 x 21
+        # mask_aggregated = tf.reduce_max(predictions, axis=0)
+        mask_aggregated = tf.reduce_mean(predictions, axis=0)
+        # Output Size: 128 x 128 x 1
+        predicted_masks = create_mask(mask_aggregated)
+        final_mask = tf.image.resize(
+            predicted_masks, image_size, method="nearest")  # Output Size: 512 x 512 x 1
 
-        mask_aggregated = tf.reduce_max(predicted_masks, axis=0)
+        # predicted_masks = tf.map_fn(
+        #     fn=lambda x: create_mask(x), elems=predictions, fn_output_signature=tf.int64)
 
         if save_output:
             tf.keras.utils.save_img(os.path.join(
-                DROPOUT_OUTPUT, f"{image_name}.png"), mask_aggregated, scale=False)
+                DROPOUT_OUTPUT, f"{image_name}.png"), final_mask, scale=False)
 
         true_mask_path = os.path.join(
             PASCAL_ROOT, "SegmentationClassAug", f"{image_name}.png")
@@ -89,14 +105,14 @@ def dropout_sampling(image_paths, model, num_repetition, image_size=(512, 512), 
 
         standard_iou_single = compute_IoU(
             true_mask, standard_mask, img_size=IMG_SIZE, class_id=CLASS_ID)
-        mask_iou_single = compute_IoU(
-            true_mask, mask_aggregated, img_size=IMG_SIZE, class_id=CLASS_ID)
+        final_iou_single = compute_IoU(
+            true_mask, final_mask, img_size=IMG_SIZE, class_id=CLASS_ID)
 
         standard_ious_single.append(standard_iou_single)
-        mask_ious_single.append(mask_iou_single)
+        final_ious_single.append(final_iou_single)
 
     avg_standard_iou_single = np.mean(standard_ious_single)
-    avg_mask_iou_single = np.mean(mask_ious_single)
+    avg_mask_iou_single = np.mean(final_ious_single)
 
     print(
         f"Mask Single: {avg_mask_iou_single}, Standard Single: {avg_standard_iou_single}")
@@ -123,13 +139,16 @@ def main():
         load_weights=True,
         backbone="xception",
         alpha=1.,
-        reshape_outputs=False).build_model()
+        reshape_outputs=False).build_model(final_upsample=False)
+
+    layer_id = get_layer_id(model, layer_name="decoder_conv1_pointwise")
 
     data_list = []
     dropout_values = np.arange(0.05, 0.95, step=0.05)
 
     for d_value in dropout_values:
-        modified_model = modify_model(model, dropout_factor=round(d_value, 2))
+        modified_model = modify_model(
+            model, layer_id, dropout_factor=round(d_value, 2))
         avg_standard_iou_single, avg_mask_iou_single = dropout_sampling(images_paths_filtered, modified_model,
                                                                         NUM_REPETITION, save_output=False)
 
@@ -141,7 +160,7 @@ def main():
 
     df = pd.DataFrame(data_list)
     df.to_csv(os.path.join(DROPOUT_ROOT,
-              f"{NUM_REPETITION}rep_{NUM_SAMPLES}_samples.csv"))
+              f"{NUM_REPETITION}_rep_{NUM_SAMPLES}_samples_mean.csv"))
     print("Done")
 
 
