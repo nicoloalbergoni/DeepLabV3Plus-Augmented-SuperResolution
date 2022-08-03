@@ -5,6 +5,17 @@
   "version": "0.2.0",
   "configurations": [
     {
+      "name": "Python: Current File",
+      "type": "python",
+      "request": "launch",
+      "program": "${file}",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "env": {
+        "CUDA_VISIBLE_DEVICES": "0"
+      }
+    },
+    {
       "name": "Generate Standard Output",
       "type": "python",
       "request": "launch",
@@ -16,7 +27,7 @@
       },
       "args": [
         "--num_samples",
-        "500",
+        "10000",
         "--class_id",
         "8",
         "--backbone",
@@ -33,17 +44,6 @@
       "justMyCode": true
     },
     {
-      "name": "Python: Current File",
-      "type": "python",
-      "request": "launch",
-      "program": "${file}",
-      "console": "integratedTerminal",
-      "justMyCode": true,
-      "env": {
-        "CUDA_VISIBLE_DEVICES": "1"
-      }
-    },
-    {
       "name": "Generate Augmented Copies",
       "type": "python",
       "request": "launch",
@@ -51,13 +51,13 @@
       "console": "integratedTerminal",
       "justMyCode": true,
       "env": {
-        "CUDA_VISIBLE_DEVICES": "1"
+        "CUDA_VISIBLE_DEVICES": "0"
       },
       "args": [
         "--num_aug",
-        "200",
+        "100",
         "--num_samples",
-        "500",
+        "10000",
         "--mode",
         "argmax",
         "--angle_max",
@@ -66,7 +66,6 @@
         "80",
         "--backbone",
         "xception",
-        "--standard_output",
         // "--use_validation"
       ]
     },
