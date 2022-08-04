@@ -33,6 +33,9 @@ parser.add_argument("--backbone", help="Either mobilenet or xception, specifies 
 parser.add_argument("--use_validation",
                     help="Create data from validation set", action="store_true")
 
+parser.add_argument("--save_images",
+                    help="Save samples of augmented copies", action="store_true")
+
 args = parser.parse_args()
 
 
@@ -51,6 +54,7 @@ SHIFT_MAX = args.shift_max
 MODE = args.mode
 MODEL_BACKBONE = args.backbone
 USE_VALIDATION = args.use_validation
+SAVE_IMAGES = args.save_images
 
 DATA_DIR = os.path.join(os.getcwd(), "data")
 PASCAL_ROOT = os.path.join(DATA_DIR, "dataset_root", "VOCdevkit", "VOC2012")
@@ -225,7 +229,7 @@ def main():
     compute_augmented_features(images_paths_filtered, model, mode=MODE,
                                dest_folder=AUGMENTED_COPIES_OUTPUT_DIR, filter_class_id=CLASS_ID,
                                num_aug=NUM_AUG, angle_max=ANGLE_MAX, shift_max=SHIFT_MAX,
-                               save_output=True, image_size=IMG_SIZE)
+                               save_output=SAVE_IMAGES, image_size=IMG_SIZE)
 
 
 if __name__ == '__main__':

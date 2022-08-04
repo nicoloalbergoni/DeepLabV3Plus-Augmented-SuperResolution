@@ -81,10 +81,13 @@ def dropout_sampling(image_paths, model, num_repetition, image_size=(512, 512), 
         # Output Size: 128 x 128 x 21
         # mask_aggregated = tf.reduce_max(predictions, axis=0)
         mask_aggregated = tf.reduce_mean(predictions, axis=0)
+
         # Output Size: 128 x 128 x 1
         predicted_masks = create_mask(mask_aggregated)
+        predicted_masks = tf.where(predicted_masks == CLASS_ID, CLASS_ID, 0)
+        # Output Size: 512 x 512 x 1
         final_mask = tf.image.resize(
-            predicted_masks, image_size, method="nearest")  # Output Size: 512 x 512 x 1
+            predicted_masks, image_size, method="nearest")
 
         # predicted_masks = tf.map_fn(
         #     fn=lambda x: create_mask(x), elems=predictions, fn_output_signature=tf.int64)

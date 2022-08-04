@@ -211,7 +211,7 @@ def load_SR_data(filepath, num_aug=100, global_normalize=True):
 
 
 def compute_SR(superresolution_obj: Superresolution, class_masks, angles, shifts, filename, dest_folder,
-               SR_type="aug", max_masks=None, save_output=False, class_id=8, th_factor=0.15):
+               SR_type="aug", max_masks=None, save_intermediate_output=False, save_final_output=False, class_id=8, th_factor=0.15):
     """
     Computes the SR problem.
 
@@ -224,7 +224,8 @@ def compute_SR(superresolution_obj: Superresolution, class_masks, angles, shifts
         dest_folder (Path): Path to store the final target image.
         SR_type (str): One of 'aug', 'mean', 'max'. Defines the type of SR
         max_masks (Tensor, optional): Used in slice mode. It's the array of the max images. Defaults to None.
-        save_output (bool, optional): Store the intermediate class/max HR images. Defaults to False.
+        save_intermediate_output (bool, optional): Store the intermediate class/max HR images. Defaults to False.
+        save_final_output (bool, optional): Store the final SR output. Defaults to False.
         class_id (int, optional): class id of the selected class. Defaults to 8.
         th_factor (float, optional): Percentage factor used for thresholding the final image. Defaults to .15
     Returns:
@@ -257,14 +258,15 @@ def compute_SR(superresolution_obj: Superresolution, class_masks, angles, shifts
         th_mask = threshold_image(
             target_image_class, class_id, th_factor=th_factor)
 
-    if save_output:
+    if save_intermediate_output:
         tf.keras.utils.save_img(
             f"{out_folder}/{filename}_class.png", target_image_class, scale=True)
         if max_masks is not None:
             tf.keras.utils.save_img(
                 f"{out_folder}/{filename}_max.png", target_image_max, scale=True)
 
-    tf.keras.utils.save_img(
-        f"{out_folder}/{filename}_{SR_type}_SR.png", th_mask, scale=True)
+    if save_final_output:
+        tf.keras.utils.save_img(
+            f"{out_folder}/{filename}_{SR_type}_SR.png", th_mask, scale=True)
 
     return th_mask
