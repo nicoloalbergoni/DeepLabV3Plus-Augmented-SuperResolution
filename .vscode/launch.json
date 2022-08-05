@@ -29,7 +29,7 @@
         "--num_samples",
         "10000",
         "--class_id",
-        "8",
+        "12",
         "--backbone",
         "xception",
         // "--use_validation"
@@ -67,7 +67,9 @@
         "--backbone",
         "xception",
         // "--use_validation",
-        // "--save_images"
+        // "--save_images",
+        "--class_id",
+        "12",
       ]
     },
     {

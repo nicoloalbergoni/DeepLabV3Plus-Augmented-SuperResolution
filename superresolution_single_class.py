@@ -20,7 +20,7 @@ IMG_SIZE = (512, 512)
 FEATURE_SIZE = (128, 128)
 NUM_AUG_FOLDER = 100
 NUM_AUG = 100
-CLASS_ID = 8
+CLASS_ID = 12
 NUM_SAMPLES = None
 TH_FACTOR = 0.2
 
@@ -38,10 +38,10 @@ IMGS_PATH = os.path.join(PASCAL_ROOT, "JPEGImages")
 SUPERRES_ROOT = os.path.join(DATA_DIR, "superres_root")
 AUGMENTED_COPIES_ROOT = os.path.join(SUPERRES_ROOT, "augmented_copies")
 PRECOMPUTED_OUTPUT_DIR = os.path.join(
-    AUGMENTED_COPIES_ROOT, f"{MODEL_BACKBONE}_{MODE}_{NUM_AUG_FOLDER}{'_validation' if USE_VALIDATION else ''}")
+    AUGMENTED_COPIES_ROOT, f"{MODEL_BACKBONE}_{MODE}_{CLASS_ID}_{NUM_AUG_FOLDER}{'_validation' if USE_VALIDATION else ''}")
 STANDARD_OUTPUT_ROOT = os.path.join(SUPERRES_ROOT, "standard_output")
 STANDARD_OUTPUT_DIR = os.path.join(
-    STANDARD_OUTPUT_ROOT, f"{MODEL_BACKBONE}{'_validation' if USE_VALIDATION else ''}")
+    STANDARD_OUTPUT_ROOT, f"{MODEL_BACKBONE}_{CLASS_ID}_{'_validation' if USE_VALIDATION else ''}")
 SUPERRES_OUTPUT_DIR = os.path.join(
     SUPERRES_ROOT, f"superres_output{'_validation' if USE_VALIDATION else ''}")
 
@@ -75,7 +75,7 @@ def main():
     if not os.path.exists(wandb_dir):
         os.makedirs(wandb_dir)
 
-    wandb.init(project="Final Evaluations", entity="albergoni-nicolo", dir=wandb_dir, name="Argmax - Class 8 - All images",
+    wandb.init(project="Final Evaluations", entity="albergoni-nicolo", dir=wandb_dir, name="Argmax - Class 12 - All images",
                config=hyperparamters_default)
 
     # wandb.init(config=hyperparamters_default, dir=wandb_dir)

@@ -36,6 +36,10 @@ parser.add_argument("--use_validation",
 parser.add_argument("--save_images",
                     help="Save samples of augmented copies", action="store_true")
 
+parser.add_argument(
+    "--class_id", help="class_id for image filtering", action="store", type=int, default=8, choices=range(21), required=True)
+
+
 args = parser.parse_args()
 
 
@@ -47,7 +51,7 @@ tf.random.set_seed(SEED)
 IMG_SIZE = (512, 512)
 BATCH_SIZE = 16
 NUM_AUG = args.num_aug
-CLASS_ID = 8
+CLASS_ID = args.class_id
 NUM_SAMPLES = args.num_samples
 ANGLE_MAX = args.angle_max
 SHIFT_MAX = args.shift_max
@@ -63,10 +67,7 @@ IMGS_PATH = os.path.join(PASCAL_ROOT, "JPEGImages")
 SUPERRES_ROOT = os.path.join(DATA_DIR, "superres_root")
 AUGMENTED_COPIES_ROOT = os.path.join(SUPERRES_ROOT, "augmented_copies")
 AUGMENTED_COPIES_OUTPUT_DIR = os.path.join(AUGMENTED_COPIES_ROOT,
-                                           f"{MODEL_BACKBONE}_{MODE}_{NUM_AUG}{'_validation' if USE_VALIDATION else ''}")
-STANDARD_OUTPUT_ROOT = os.path.join(SUPERRES_ROOT, "standard_output")
-STANDARD_OUTPUT_DIR = os.path.join(
-    STANDARD_OUTPUT_ROOT, f"{MODEL_BACKBONE}{'_validation' if USE_VALIDATION else ''}")
+                                           f"{MODEL_BACKBONE}_{MODE}_{CLASS_ID}_{NUM_AUG}{'_validation' if USE_VALIDATION else ''}")
 
 
 def create_augmented_copies(image, num_aug, angle_max, shift_max):
