@@ -23,16 +23,16 @@
       "console": "integratedTerminal",
       "justMyCode": true,
       "env": {
-        "CUDA_VISIBLE_DEVICES": "0"
+        "CUDA_VISIBLE_DEVICES": "1"
       },
       "args": [
         "--num_samples",
         "10000",
         "--class_id",
-        "12",
+        "20",
         "--backbone",
         "xception",
-        // "--use_validation"
+        "--use_validation"
       ]
     },
     {
@@ -51,7 +51,7 @@
       "console": "integratedTerminal",
       "justMyCode": true,
       "env": {
-        "CUDA_VISIBLE_DEVICES": "0"
+        "CUDA_VISIBLE_DEVICES": "1"
       },
       "args": [
         "--num_aug",
@@ -66,10 +66,10 @@
         "80",
         "--backbone",
         "xception",
-        // "--use_validation",
+        "--use_validation",
         // "--save_images",
         "--class_id",
-        "12",
+        "20",
       ]
     },
     {
