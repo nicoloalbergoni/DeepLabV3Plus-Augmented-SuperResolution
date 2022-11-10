@@ -111,7 +111,7 @@ def main():
     # shift_y_values = np.linspace(-80, 80, num=9, dtype=int)
 
     angle_values = [round(angle, 2)
-                    for angle in np.arange(-0.7, 0.8, step=0.05)]
+                    for angle in np.arange(-0.7, 0.75, step=0.05)]
     shift_x_values = np.linspace(-80, 80, num=9, dtype=int)
     shift_y_values = np.linspace(-80, 80, num=9, dtype=int)
 
