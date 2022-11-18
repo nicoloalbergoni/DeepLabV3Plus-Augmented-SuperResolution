@@ -10,6 +10,8 @@ import tensorflow_addons as tfa
 from utils import load_image, get_prediction, create_mask
 from superresolution_scripts.superres_utils import get_img_paths, filter_images_by_class, min_max_normalization
 
+os.environ["TF_FORCE_GPU_ALLOW_GROWTH"] = "true"
+
 parser = argparse.ArgumentParser()
 parser.add_argument(
     "--num_samples", help="Number of samples taken from the dataset", action="store", type=int, default=None)

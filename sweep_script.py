@@ -9,6 +9,7 @@ from utils import load_image, compute_IoU
 from superresolution_scripts.superres_utils import list_precomputed_data_paths, load_SR_data, compute_SR, normalize_coefficients
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+os.environ["TF_FORCE_GPU_ALLOW_GROWTH"] = "true"
 
 SEED = 1234
 
@@ -22,12 +23,12 @@ FEATURE_SIZE = (128, 128)
 NUM_AUG = 100
 CLASS_ID = 8
 NUM_SAMPLES = 500
-MODE = "argmax"
+MODE = "slice"
 MODEL_BACKBONE = "xception"
 USE_VALIDATION = False
 SAVE_SLICE_OUTPUT = False
 SAVE_FINAL_SR_OUTPUT = False
-TH_FACTOR = 0.2
+TH_FACTOR = 0.65
 
 DATA_DIR = os.path.join(os.getcwd(), "data")
 PASCAL_ROOT = os.path.join(DATA_DIR, "dataset_root", "VOCdevkit", "VOC2012")

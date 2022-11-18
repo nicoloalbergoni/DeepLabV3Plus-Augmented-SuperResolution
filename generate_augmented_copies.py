@@ -11,6 +11,7 @@ from utils import load_image, create_mask
 from superresolution_scripts.superres_utils import get_img_paths, filter_images_by_class, min_max_normalization
 
 # os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ["TF_FORCE_GPU_ALLOW_GROWTH"] = "true"
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--num_aug", help="Number of augmented copies created for each image",

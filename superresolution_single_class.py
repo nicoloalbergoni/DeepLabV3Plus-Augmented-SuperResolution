@@ -14,18 +14,19 @@ np.random.seed(SEED)
 tf.random.set_seed(SEED)
 
 # tf.config.run_functions_eagerly(True)
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+os.environ["TF_FORCE_GPU_ALLOW_GROWTH"] = "true"
 
 IMG_SIZE = (512, 512)
 FEATURE_SIZE = (128, 128)
 NUM_AUG_FOLDER = 100
 NUM_AUG = 100
-CLASS_ID = 20
+CLASS_ID = 15
 NUM_SAMPLES = None
-TH_FACTOR = 0.2
+TH_FACTOR = 0.65
 
 
-MODE = "argmax"
+MODE = "slice"
 MODEL_BACKBONE = "xception"
 USE_VALIDATION = True
 SAVE_SLICE_OUTPUT = False
@@ -49,8 +50,8 @@ SUPERRES_OUTPUT_DIR = os.path.join(
 def main():
     hyperparamters_default = {
         "lambda_df": 1.0,
-        "lambda_tv": 0.3,
-        "lambda_L2": 0.7,
+        "lambda_tv": 0.85,
+        "lambda_L2": 2,
         "lambda_L1": 0,
         "num_iter": 300,
         "num_aug": NUM_AUG,
@@ -75,10 +76,11 @@ def main():
     if not os.path.exists(wandb_dir):
         os.makedirs(wandb_dir)
 
-    wandb.init(project="Final Evaluations", entity="albergoni-nicolo", dir=wandb_dir, name=f"Argmax - Class {CLASS_ID} {'- Validation' if USE_VALIDATION else ''}",
-               config=hyperparamters_default)
+    wandb.init(project="Slice-Max - Final - Validation", entity="albergoni-nicolo",
+               dir=wandb_dir, name=f"Class {CLASS_ID}", config=hyperparamters_default)
 
-    # wandb.init(config=hyperparamters_default, dir=wandb_dir)
+    # wandb.init(config=hyperparamters_default, dir=wandb_dir,
+    #            project="Argmax - no normalization no L1")
 
     config = wandb.config
 
