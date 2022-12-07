@@ -14,23 +14,23 @@ np.random.seed(SEED)
 tf.random.set_seed(SEED)
 
 # tf.config.run_functions_eagerly(True)
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 os.environ["TF_FORCE_GPU_ALLOW_GROWTH"] = "true"
 
 IMG_SIZE = (512, 512)
 FEATURE_SIZE = (128, 128)
 NUM_AUG_FOLDER = 100
 NUM_AUG = 100
-CLASS_ID = 15
-NUM_SAMPLES = None
-TH_FACTOR = 0.65
+CLASS_ID = 8
+NUM_SAMPLES = 50
+TH_FACTOR = 0.2
 
 
-MODE = "slice"
+MODE = "argmax"
 MODEL_BACKBONE = "xception"
 USE_VALIDATION = True
 SAVE_SLICE_OUTPUT = False
-SAVE_FINAL_SR_OUTPUT = False
+SAVE_FINAL_SR_OUTPUT = True
 
 DATA_DIR = os.path.join(os.getcwd(), "data")
 PASCAL_ROOT = os.path.join(DATA_DIR, "dataset_root", "VOCdevkit", "VOC2012")
@@ -44,14 +44,14 @@ STANDARD_OUTPUT_ROOT = os.path.join(SUPERRES_ROOT, "standard_output")
 STANDARD_OUTPUT_DIR = os.path.join(
     STANDARD_OUTPUT_ROOT, f"{MODEL_BACKBONE}_{CLASS_ID}{'_validation' if USE_VALIDATION else ''}")
 SUPERRES_OUTPUT_DIR = os.path.join(
-    SUPERRES_ROOT, f"superres_output{'_validation' if USE_VALIDATION else ''}")
+    SUPERRES_ROOT, f"superres_output_{MODE}{'_validation' if USE_VALIDATION else ''}")
 
 
 def main():
     hyperparamters_default = {
         "lambda_df": 1.0,
-        "lambda_tv": 0.85,
-        "lambda_L2": 2,
+        "lambda_tv": 0.3,
+        "lambda_L2": 0.7,
         "lambda_L1": 0,
         "num_iter": 300,
         "num_aug": NUM_AUG,
@@ -76,7 +76,7 @@ def main():
     if not os.path.exists(wandb_dir):
         os.makedirs(wandb_dir)
 
-    wandb.init(project="Slice-Max - Final - Validation", entity="albergoni-nicolo",
+    wandb.init(project="Tests", entity="albergoni-nicolo",
                dir=wandb_dir, name=f"Class {CLASS_ID}", config=hyperparamters_default)
 
     # wandb.init(config=hyperparamters_default, dir=wandb_dir,

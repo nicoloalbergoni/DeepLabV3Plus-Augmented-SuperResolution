@@ -12,7 +12,7 @@
       "console": "integratedTerminal",
       "justMyCode": true,
       "env": {
-        "CUDA_VISIBLE_DEVICES": "0"
+        "CUDA_VISIBLE_DEVICES": "1"
       }
     },
     {
@@ -23,25 +23,17 @@
       "console": "integratedTerminal",
       "justMyCode": true,
       "env": {
-        "CUDA_VISIBLE_DEVICES": "1"
+        "CUDA_VISIBLE_DEVICES": "0"
       },
       "args": [
         "--num_samples",
-        "10000",
+        "5000",
         "--class_id",
-        "20",
+        "8",
         "--backbone",
         "xception",
         "--use_validation"
       ]
-    },
-    {
-      "name": "GPU Test",
-      "type": "python",
-      "request": "launch",
-      "program": "${workspaceFolder}/gpu_test.py",
-      "console": "integratedTerminal",
-      "justMyCode": true
     },
     {
       "name": "Generate Augmented Copies",
@@ -51,13 +43,13 @@
       "console": "integratedTerminal",
       "justMyCode": true,
       "env": {
-        "CUDA_VISIBLE_DEVICES": "1"
+        "CUDA_VISIBLE_DEVICES": "0"
       },
       "args": [
         "--num_aug",
         "100",
         "--num_samples",
-        "10000",
+        "100",
         "--mode",
         "argmax",
         "--angle_max",
@@ -67,9 +59,9 @@
         "--backbone",
         "xception",
         "--use_validation",
-        // "--save_images",
+        //"--save_images",
         "--class_id",
-        "20",
+        "8",
       ]
     },
     {
@@ -83,6 +75,14 @@
         "--remove_cmap",
         "--download_berkley"
       ]
-    }
+    },
+    {
+      "name": "GPU Test",
+      "type": "python",
+      "request": "launch",
+      "program": "${workspaceFolder}/gpu_test.py",
+      "console": "integratedTerminal",
+      "justMyCode": true
+    },
   ]
 }
