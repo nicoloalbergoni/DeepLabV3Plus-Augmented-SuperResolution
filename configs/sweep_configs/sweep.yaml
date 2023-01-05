@@ -1,0 +1,43 @@
+entity: albergoni-nicolo
+project: Slice - no normalization L1
+program: sweep_script.py
+method: bayes
+metric:
+  goal: maximize
+  name: aug_iou_single
+parameters:
+  lambda_df:
+    value: 1.0
+  lambda_tv:
+    max: 5
+    min: 0
+    distribution: q_uniform
+    q: 0.05
+  lambda_L2:
+    max: 5
+    min: 0
+    distribution: q_uniform
+    q: 0.05
+  lambda_L1:
+    max: 5
+    min: 0
+    distribution: q_uniform
+    q: 0.05
+  num_iter:
+    value: 300
+  optimizer:
+    value: adam
+  lr_scheduler:
+    value: True
+  decay_rate:
+    value: 0.3
+  decay_steps:
+    value: 60
+  learning_rate:
+    value: 1e-3     
+  copy_dropout:
+    value: 0.0
+  use_BTV:
+    value: False
+  amsgrad:
+    value: True   

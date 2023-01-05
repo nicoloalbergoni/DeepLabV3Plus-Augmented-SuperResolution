@@ -1,0 +1,62 @@
+entity: albergoni-nicolo
+project: Argmax 500 sweep all
+program: sweep_script.py
+method: bayes
+metric:
+  goal: maximize
+  name: aug_iou_single
+parameters:
+  lambda_df:
+    value: 1.0
+  lambda_tv:
+    max: 1
+    min: 0.0
+    distribution: uniform
+  lambda_L2:
+    max: 1
+    min: 0.0
+    distribution: uniform
+  lambda_L1:
+    max: 1
+    min: 0.0
+    distribution: uniform
+  copy_dropout:
+    max: 0.4
+    min: 0.0
+    distribution: q_uniform
+    q: 0.1
+  num_iter:
+    values:
+      - 300
+      - 400
+      - 500
+      - 600
+  optimizer:
+    values: 
+      - "adam"
+      - "adagrad"
+      - "adadelta"
+  lr_scheduler:
+    value: True
+  decay_rate:
+    max: 1.0
+    min: 0.0
+    distribution: q_uniform
+    q: 0.05
+  decay_steps:
+    max: 100
+    min: 20
+    distribution: q_uniform
+    q: 20
+  learning_rate:
+    values:
+      - 1e-2
+      - 1e-3 
+      - 1e-1
+      - 1e-4
+  use_BTV:
+    values:
+      - True
+      - False 
+  amsgrad:
+    value: False

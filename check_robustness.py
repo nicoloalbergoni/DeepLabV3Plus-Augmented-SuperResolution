@@ -1,27 +1,28 @@
+"""
+Script to check the robustness of the DeepLabV3+ model to different augmentation values.
+We aim to see the model's performance drop (in mIoU) against a set of images subject to different rotation/translation values.
+Outputs a cvs file with the results for all augmentation combinations.
+"""
+
 import os
-import wandb
-import random
 import gc
 import csv
+import random
 import itertools
 import numpy as np
 from tqdm import tqdm
 import tensorflow as tf
-from matplotlib import pyplot as plt
 import tensorflow_addons as tfa
 from model import DeeplabV3Plus
 from superresolution_scripts.superres_utils import filter_images_by_class, get_img_paths
 from utils import load_image, compute_IoU, create_mask
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+# os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 SEED = 1234
-
 random.seed(SEED)
 np.random.seed(SEED)
 tf.random.set_seed(SEED)
-
-# tf.config.run_functions_eagerly(True)
 
 IMG_SIZE = (512, 512)
 CLASS_ID = 8
@@ -47,27 +48,6 @@ def augment_images(images, angle, shift_x, shift_y, interpolation="bilinear"):
         rotated_images, [shift_x, shift_y], interpolation=interpolation, fill_mode="constant")
 
     return translated_images
-
-
-def save_plot(input_image, prediction, ground_truth, plot_title, save_path):
-    plt.figure()
-
-    plt.subplot(1, 2, 1)
-    plt.title(plot_title)
-    plt.imshow(tf.keras.preprocessing.image.array_to_img(input_image))
-    plt.imshow(tf.keras.preprocessing.image.array_to_img(
-        prediction), alpha=0.5, cmap="jet")
-
-    plt.subplot(1, 2, 2)
-    plt.title("Ground Truth")
-    plt.imshow(tf.keras.preprocessing.image.array_to_img(ground_truth))
-
-    plt.axis("off")
-    # plt.colorbar()
-    plt.figtext(0.99, 0.01, f"Labels: {str(np.unique(prediction))}, GT: {str(np.unique(ground_truth))}",
-                horizontalalignment='right')
-    plt.savefig(save_path)
-    plt.close()
 
 
 def main():
@@ -135,16 +115,9 @@ def main():
 
         ious = []
         for k, pred in enumerate(predictions):
-            image_name = os.path.splitext(os.path.basename(image_paths[k]))[0]
-            save_path = os.path.join(IMAGE_OUTPUT_FOLDER, f"{image_name}.png")
-
             pred_mask = create_mask(pred)
             iou = round(compute_IoU(
                 aug_gt[k], pred_mask, class_id=None if not SINGLE_CLASS else CLASS_ID), 3)
-
-            # plot_title = f"mIoU: {iou}, Angle: {angle}, Shift X: {shift_x}, Shift Y: {shift_y}"
-            # save_plot(aug_images[k], pred_mask,
-            #           aug_gt[k], plot_title, save_path)
 
             ious.append(iou)
 
