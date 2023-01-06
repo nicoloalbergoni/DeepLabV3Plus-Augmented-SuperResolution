@@ -1,7 +1,7 @@
 import os
+import gc
 import h5py
 import argparse
-import gc
 import numpy as np
 from tqdm import tqdm
 import tensorflow as tf
@@ -20,7 +20,7 @@ parser.add_argument(
     "--num_samples", help="Number of samples taken from the dataset", action="store", type=int, default=500)
 
 parser.add_argument(
-    "--mode", help="Whether to operate in slicing, slicing variation or argmax mode", action="store", type=str, choices=["slice", "slice_var", "argmax"], default="slice")
+    "--mode", help="Whether to operate in slicing, slicing variation or argmax mode", action="store", type=str, choices=["slice_max", "slice", "argmax"], default="argmax")
 
 parser.add_argument("--angle_max", help="Max angle value (in radians) used for rotations", action="store",
                     type=float, default=0.3)
@@ -148,7 +148,7 @@ def compute_augmented_features(images_paths, model, dest_folder, filter_class_id
 
         for i, prediction in enumerate(predictions):
 
-            if mode == "slice":
+            if mode == "slice_max":
                 # Get the slice corresponding to the class id
                 class_mask = tf.gather(
                     prediction, filter_class_id, axis=-1)[..., tf.newaxis]
@@ -161,7 +161,7 @@ def compute_augmented_features(images_paths, model, dest_folder, filter_class_id
 
                 max_masks.append(max_mask)
 
-            elif mode == "slice_var":
+            elif mode == "slice":
                 # Get the slice corresponding to the class id
                 class_mask = tf.gather(
                     prediction, filter_class_id, axis=-1)[..., tf.newaxis]
@@ -186,14 +186,14 @@ def compute_augmented_features(images_paths, model, dest_folder, filter_class_id
             if save_output and (i % 10) == 0:
                 tf.keras.utils.save_img(
                     f"{output_folder}/{i}_class.png", class_mask, scale=True)
-                if mode == "slice":
+                if mode == "slice_max":
                     tf.keras.utils.save_img(
                         f"{output_folder}/{i}_max.png", max_mask, scale=True)
 
         file = h5py.File(f"{output_folder}/{image_name}.hdf5", "w")
         file.create_dataset("class_masks", data=class_masks)
 
-        if mode == "slice":
+        if mode == "slice_max":
             file.create_dataset("max_masks", data=max_masks)
 
         file.create_dataset("angles", data=angles)
