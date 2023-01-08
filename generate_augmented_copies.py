@@ -2,9 +2,10 @@ import os
 import argparse
 import numpy as np
 import tensorflow as tf
+from tqdm import tqdm
 from model import DeeplabV3Plus
 from superresolution_scripts.superres_utils import get_img_paths, filter_images_by_class
-from superresolution_scripts.augmentation_utils import compute_augmented_features
+from superresolution_scripts.augmentation_utils import compute_augmented_feature_maps
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 os.environ["TF_FORCE_GPU_ALLOW_GROWTH"] = "true"
@@ -30,9 +31,6 @@ parser.add_argument("--backbone", help="Either mobilenet or xception, specifies 
 parser.add_argument("--use_validation",
                     help="Create data from validation set", action="store_true")
 
-parser.add_argument("--save_images",
-                    help="Save samples of augmented copies", action="store_true")
-
 parser.add_argument(
     "--class_id", help="class_id for image filtering", action="store", type=int, default=8, choices=range(21), required=True)
 
@@ -55,7 +53,6 @@ SHIFT_MAX = args.shift_max
 MODE = args.mode
 MODEL_BACKBONE = args.backbone
 USE_VALIDATION = args.use_validation
-SAVE_IMAGES = args.save_images
 
 DATA_DIR = os.path.join(os.getcwd(), "data")
 PASCAL_ROOT = os.path.join(DATA_DIR, "dataset_root", "VOCdevkit", "VOC2012")
@@ -88,10 +85,10 @@ def main():
     ).build_model(final_upsample=False)
 
     print("Generating augmented copies...")
-    compute_augmented_features(images_paths_filtered, model, mode=MODE,
-                               dest_folder=AUGMENTED_COPIES_OUTPUT_DIR, filter_class_id=CLASS_ID,
-                               num_aug=NUM_AUG, angle_max=ANGLE_MAX, shift_max=SHIFT_MAX,
-                               save_output=SAVE_IMAGES, image_size=IMG_SIZE, batch_size=BATCH_SIZE)
+    for image_path in tqdm(images_paths_filtered):
+        compute_augmented_feature_maps(image_path, model, mode=MODE, filter_class_id=CLASS_ID, num_aug=NUM_AUG,
+                                       angle_max=ANGLE_MAX, shift_max=SHIFT_MAX,
+                                       image_size=IMG_SIZE, batch_size=BATCH_SIZE, dest_folder=AUGMENTED_COPIES_OUTPUT_DIR)
 
 
 if __name__ == '__main__':

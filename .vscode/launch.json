@@ -47,9 +47,9 @@
       },
       "args": [
         "--num_aug",
-        "100",
+        "10",
         "--num_samples",
-        "100",
+        "5",
         "--mode",
         "argmax",
         "--angle_max",
@@ -59,7 +59,6 @@
         "--backbone",
         "xception",
         "--use_validation",
-        //"--save_images",
         "--class_id",
         "8",
       ]
