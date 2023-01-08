@@ -8,8 +8,10 @@ import os
 
 def get_pascal_img_list(pascal_root):
 
-    filename_train = os.path.join(pascal_root, "ImageSets", "Segmentation", "train.txt")
-    filename_val = os.path.join(pascal_root, "ImageSets", "Segmentation", "val.txt")
+    filename_train = os.path.join(
+        pascal_root, "ImageSets", "Segmentation", "train.txt")
+    filename_val = os.path.join(
+        pascal_root, "ImageSets", "Segmentation", "val.txt")
 
     train_list = [line.rstrip() for line in open(filename_train)]
     val_list = [line.rstrip() for line in open(filename_val)]
@@ -34,8 +36,10 @@ def write_list_to_file(file_path, data_list):
 
 
 def main():
-    DATA_ROOT = os.path.join(os.getcwd(), "data")
-    PASCAL_ROOT = os.path.join(DATA_ROOT, "dataset_root", "VOCdevkit", "VOC2012")
+    PROJECT_ROOT = os.path.dirname(os.path.dirname(__file__))
+    DATA_ROOT = os.path.join(PROJECT_ROOT, "data")
+    PASCAL_ROOT = os.path.join(
+        DATA_ROOT, "dataset_root", "VOCdevkit", "VOC2012")
     BERKLEY_ROOT = os.path.join(DATA_ROOT, "berkley_file_lists")
     OUTPUT_FOLDER = os.path.join(DATA_ROOT, "augmented_file_lists")
 

@@ -183,7 +183,7 @@ def load_SR_data(filepath, num_aug=100, global_normalize=True):
 
     max_masks = None
 
-    if mode != "slice_var":
+    if mode != "slice":
         # For slice or argmax mode normalization is needed
 
         global_min, global_max = (tf.reduce_min(class_masks), tf.reduce_max(class_masks)) if global_normalize else (
@@ -193,7 +193,7 @@ def load_SR_data(filepath, num_aug=100, global_normalize=True):
             fn=lambda image: min_max_normalization(image.numpy(), new_min=0.0, new_max=1.0, global_min=global_min,
                                                    global_max=global_max), elems=class_masks)
 
-    if mode == "slice":
+    if mode == "slice_max":
         # max_class is only available for argmax mode
         max_masks = file["max_masks"][:num_aug]
         max_masks = tf.stack(max_masks)

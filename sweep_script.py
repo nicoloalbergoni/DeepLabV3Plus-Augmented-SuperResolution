@@ -1,14 +1,17 @@
+"""
+Script used to tune the Augmented Super-Resolution hyperparameters using the Weight & Biases Sweep API.
+"""
 import os
 import wandb
 import numpy as np
 from tqdm import tqdm
 import tensorflow as tf
-from superresolution_scripts.superresolution import Superresolution
-from superresolution_scripts.optimizer import Optimizer
 from utils import load_image, compute_IoU
-from superresolution_scripts.superres_utils import list_precomputed_data_paths, load_SR_data, compute_SR, normalize_coefficients
+from superresolution_scripts.optimizer import Optimizer
+from superresolution_scripts.superresolution import Superresolution
+from superresolution_scripts.superres_utils import list_precomputed_data_paths, load_SR_data, compute_SR
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 os.environ["TF_FORCE_GPU_ALLOW_GROWTH"] = "true"
 
 SEED = 1234

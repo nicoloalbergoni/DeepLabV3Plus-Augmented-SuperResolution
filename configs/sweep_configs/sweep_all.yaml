@@ -60,8 +60,3 @@ parameters:
       - False 
   amsgrad:
     value: False
-#command:
-#- ${env}
-#- C:\Users\alber\Desktop\DeepLabV3Plus-Augmented-SuperResolution\venv\Scripts\python.exe
-#- ${program}
-#- ${args}

@@ -11,7 +11,17 @@ def shorten(s, subs):
 
 
 def download_dataset(dataset_url, dest_folder):
-    #TODO: handle other extension
+    """
+    Donwloand the PASCAL VOC 2012 dataset from the given URL
+
+    Args:
+        dataset_url (str): ULR of the dataset
+        dest_folder (str): Destination folder in which the dataset is downloaded
+
+    Returns:
+        str: Full path to the downloaded dataset
+    """
+    # TODO: handle other extension
     extension = ".zip" if ".zip" in dataset_url else ".tar"
     filename = shorten(dataset_url.split("/")[-1], extension)
     full_dest_path = os.path.join(dest_folder, filename)
@@ -20,7 +30,8 @@ def download_dataset(dataset_url, dest_folder):
         os.makedirs(dest_folder)
 
     if os.path.exists(full_dest_path):
-        print(f"File {filename} already in destination folder, skipping download")
+        print(
+            f"File {filename} already in destination folder, skipping download")
         return full_dest_path
 
     def _progress(count, block_size, total_size):
@@ -39,6 +50,17 @@ def download_dataset(dataset_url, dest_folder):
 
 
 def extract_file(filepath, dest_folder, is_extracted="./data/dataset_root/VOCdevkit"):
+    """
+    Extracts the dataset from the zip/tar file
+
+    Args:
+        filepath (str): Path of the dataset
+        dest_folder (str): Destination path for the extracted contents
+        is_extracted (str, optional): Optional path to check if the dataset has already been extracted. Defaults to "./data/dataset_root/VOCdevkit".
+
+    Raises:
+        ValueError: if the files is neither zip nor tar
+    """
 
     # TODO: Find a better way to understand when to skip unzip even for different datasets
     if os.path.exists(is_extracted):
