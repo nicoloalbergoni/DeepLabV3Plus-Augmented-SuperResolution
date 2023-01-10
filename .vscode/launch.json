@@ -32,7 +32,7 @@
         "8",
         "--backbone",
         "xception",
-        "--use_validation"
+        // "--use_validation"
       ]
     },
     {
@@ -47,9 +47,9 @@
       },
       "args": [
         "--num_aug",
-        "10",
+        "100",
         "--num_samples",
-        "5",
+        "5000",
         "--mode",
         "argmax",
         "--angle_max",
@@ -74,14 +74,6 @@
         "--remove_cmap",
         "--download_berkley"
       ]
-    },
-    {
-      "name": "GPU Test",
-      "type": "python",
-      "request": "launch",
-      "program": "${workspaceFolder}/gpu_test.py",
-      "console": "integratedTerminal",
-      "justMyCode": true
-    },
+    }
   ]
 }
