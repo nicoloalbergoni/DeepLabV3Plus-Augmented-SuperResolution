@@ -77,7 +77,7 @@ def compute_augmented_feature_maps(image_path, model, filter_class_id, mode="sli
     # Used to clear memory as it appears that there is a memory leak with something related to model.predict
     _ = gc.collect()
 
-    for i, prediction in enumerate(predictions):
+    for prediction in predictions:
 
         if mode == "slice_max":
             # Get the slice corresponding to the class id

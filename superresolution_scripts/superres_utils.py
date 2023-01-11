@@ -211,7 +211,7 @@ def load_SR_data(filepath, num_aug=100, global_normalize=True):
 
 
 def compute_SR(superresolution_obj: Superresolution, class_masks, angles, shifts, filename, dest_folder,
-               SR_type="aug", max_masks=None, save_intermediate_output=False, save_final_output=False, class_id=8, th_factor=0.15):
+               SR_type="aug", max_masks=[], save_intermediate_output=False, save_final_output=False, class_id=8, th_factor=0.15):
     """
     Computes the SR problem.
 
@@ -223,7 +223,7 @@ def compute_SR(superresolution_obj: Superresolution, class_masks, angles, shifts
         filename (str): The filename asscociated with the image
         dest_folder (Path): Path to store the final target image.
         SR_type (str): One of 'aug', 'mean', 'max'. Defines the type of SR
-        max_masks (Tensor, optional): Used in slice mode. It's the array of the max images. Defaults to None.
+        max_masks (Tensor, optional): Used in slice mode. It's the array of the max images. Defaults to empty list.
         save_intermediate_output (bool, optional): Store the intermediate class/max HR images. Defaults to False.
         save_final_output (bool, optional): Store the final SR output. Defaults to False.
         class_id (int, optional): class id of the selected class. Defaults to 8.
@@ -232,8 +232,8 @@ def compute_SR(superresolution_obj: Superresolution, class_masks, angles, shifts
         ndarray: The final HR image
     """
 
-    assert(SR_type in ["aug", "mean", "max"],
-           "SR_type must be either 'aug', 'mean' or 'max'")
+    assert (SR_type in ["aug", "mean", "max"],
+            "SR_type must be either 'aug', 'mean' or 'max'")
 
     out_folder = os.path.join(dest_folder, f"{SR_type}_SR")
 
@@ -249,7 +249,8 @@ def compute_SR(superresolution_obj: Superresolution, class_masks, angles, shifts
 
     target_image_class, _ = SR_function(class_masks, angles, shifts)
 
-    if max_masks is not None:
+    # Super-Resolution of the max mask has to be computed only if we have computed the data, i.e. only in slice_max OPM
+    if len(max_masks) == len(class_masks):
         target_image_max, _ = SR_function(max_masks, angles, shifts)
         th_mask = threshold_image(
             target_image_class, class_id, th_mask=target_image_max)
